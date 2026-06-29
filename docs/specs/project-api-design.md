@@ -6,7 +6,7 @@ Project API 1차 구현은 `docs/domain/project-workspace.md`에서 확정한 Pr
 
 ## 기술 선택
 
-백엔드는 NestJS와 Prisma를 사용한다. NestJS는 API 서버 구조화와 테스트 구성이 좋고, TypeScript 기반 클라이언트와 타입 관점을 맞추기 쉽다. Prisma는 PostgreSQL schema 기반 모델링, migration, 타입 안전한 저장소 구현에 적합하다.
+백엔드는 NestJS 11과 Prisma 6.19 계열을 사용한다. NestJS는 API 서버 구조화와 테스트 구성이 좋고, TypeScript 기반 클라이언트와 타입 관점을 맞추기 쉽다. Prisma는 PostgreSQL schema 기반 모델링, migration, 타입 안전한 저장소 구현에 적합하다. Prisma 7은 generator와 adapter 구성이 달라지는 변경이 있어 1차 MVP에서는 도입하지 않는다.
 
 데이터베이스는 PostgreSQL을 사용한다. 연결 기준은 다음과 같다.
 
@@ -49,7 +49,7 @@ prisma/
 
 ## 데이터 모델
 
-Prisma 모델은 `documind_backend` schema에 `Project` 테이블을 만든다. 논리 필드는 도메인 문서를 따른다.
+Prisma 모델은 multi-schema 설정을 사용해 `documind_backend` schema에 `Project` 테이블을 만든다. 논리 필드는 도메인 문서를 따른다.
 
 - `id`: UUID v7 문자열 또는 PostgreSQL uuid 타입
 - `ownerId`: UUID 문자열 또는 PostgreSQL uuid 타입
@@ -172,7 +172,10 @@ NODE_ENV="development"
    - 404 프로젝트 없음
    - 409 상태 전환 충돌
 
-실제 PostgreSQL 연동 테스트는 1차 구현에서 최소 smoke 수준으로 둔다. 빠른 반복을 위해 핵심 도메인과 유스케이스 테스트는 인메모리 repository로 검증한다.
+4. PostgreSQL integration smoke
+   - Prisma schema, multi-schema 설정, UUID 저장, 정렬 쿼리, count 쿼리 확인
+
+빠른 반복을 위해 핵심 도메인과 유스케이스 테스트는 인메모리 repository로 검증한다. 실제 PostgreSQL 연동은 별도 integration smoke로 분리한다.
 
 ## 완료 기준
 

@@ -6,7 +6,7 @@
 
 **Architecture:** 모듈러 모놀리스 안에 `project-workspace` 모듈을 두고, 도메인 모델은 NestJS와 Prisma에 의존하지 않는다. Controller는 HTTP 요청/응답과 검증을 담당하고, Use Case는 Repository port, Clock, IdGenerator, OwnerProvider에만 의존한다. Prisma는 PostgreSQL adapter로만 사용한다.
 
-**Tech Stack:** Node.js, TypeScript, NestJS, Prisma, PostgreSQL, Jest, Supertest
+**Tech Stack:** Node.js 20.11 이상, TypeScript 6, NestJS 11, Prisma 6.19, PostgreSQL, Jest 29, Supertest
 
 ---
 
@@ -68,6 +68,7 @@ src/project-workspace/testing/in-memory-project.repository.ts
 test/project-domain.spec.ts
 test/project-use-cases.spec.ts
 test/project-api.e2e-spec.ts
+test/project-api.integration-spec.ts
 docs/development/backend-local-run.md
 ```
 
@@ -94,6 +95,10 @@ docs/development/backend-local-run.md
   "private": true,
   "description": "DocuMind backend API",
   "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20.11.0",
+    "npm": ">=10.0.0"
+  },
   "scripts": {
     "build": "nest build",
     "start": "nest start",
@@ -102,39 +107,40 @@ docs/development/backend-local-run.md
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
     "test:e2e": "jest --config jest.config.ts --runInBand test/project-api.e2e-spec.ts",
+    "test:integration": "jest --config jest.config.ts --runInBand test/project-api.integration-spec.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev --schema prisma/schema.prisma"
   },
   "dependencies": {
-    "@nestjs/common": "latest",
-    "@nestjs/core": "latest",
-    "@nestjs/platform-express": "latest",
-    "@prisma/client": "latest",
-    "class-transformer": "latest",
-    "class-validator": "latest",
-    "reflect-metadata": "latest",
-    "rxjs": "latest",
-    "uuid": "latest"
+    "@nestjs/common": "^11.1.27",
+    "@nestjs/core": "^11.1.27",
+    "@nestjs/platform-express": "^11.1.27",
+    "@prisma/client": "^6.19.3",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2",
+    "uuid": "^14.0.1"
   },
   "devDependencies": {
-    "@eslint/js": "latest",
-    "@nestjs/cli": "latest",
-    "@nestjs/testing": "latest",
-    "@types/express": "latest",
-    "@types/jest": "latest",
-    "@types/node": "latest",
-    "@types/supertest": "latest",
-    "@types/uuid": "latest",
-    "eslint": "latest",
-    "globals": "latest",
-    "jest": "latest",
-    "prisma": "latest",
-    "supertest": "latest",
-    "ts-jest": "latest",
-    "ts-loader": "latest",
-    "ts-node": "latest",
-    "typescript": "latest",
-    "typescript-eslint": "latest"
+    "@eslint/js": "^10.6.0",
+    "@nestjs/cli": "^11.0.23",
+    "@nestjs/testing": "^11.1.27",
+    "@types/express": "^5.0.6",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^26.0.1",
+    "@types/supertest": "^6.0.3",
+    "@types/uuid": "^11.0.0",
+    "eslint": "^10.6.0",
+    "globals": "^17.7.0",
+    "jest": "^29.7.0",
+    "prisma": "^6.19.3",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.11",
+    "ts-loader": "^9.6.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1"
   }
 }
 ```
@@ -165,7 +171,7 @@ Expected: `package-lock.json` 생성, install exit code 0.
     "incremental": true,
     "strict": true,
     "skipLibCheck": true,
-    "strictPropertyInitialization": false,
+    "strictPropertyInitialization": true,
     "noImplicitAny": true,
     "strictNullChecks": true
   }
@@ -199,7 +205,8 @@ import type { Config } from "jest";
 const config: Config = {
   moduleFileExtensions: ["js", "json", "ts"],
   rootDir: ".",
-  testRegex: ".*\\.spec\\.ts$",
+  testMatch: ["<rootDir>/test/**/*.spec.ts"],
+  testPathIgnorePatterns: ["/node_modules/", "\\.e2e-spec\\.ts$", "\\.integration-spec\\.ts$"],
   transform: { "^.+\\.(t|j)s$": "ts-jest" },
   collectCoverageFrom: ["src/**/*.(t|j)s"],
   testEnvironment: "node"
@@ -211,6 +218,8 @@ export default config;
 - [ ] **Step 4: ESLint 설정 작성**
 
 `eslint.config.mjs`:
+
+Node.js 20.11 이상을 package `engines`로 고정하므로 `import.meta.dirname`을 사용할 수 있다. Node.js 하위 버전을 지원해야 하면 `fileURLToPath(import.meta.url)` 기반으로 교체한다.
 
 ```js
 import js from "@eslint/js";
@@ -335,6 +344,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  schemas  = ["documind_backend"]
 }
 
 enum ProjectType {
@@ -752,7 +762,7 @@ export class PrismaProjectRepository implements ProjectRepository {
 
   async list(query: ProjectListQuery): Promise<PageResponse<ProjectSnapshot>> {
     const where = query.status === "ALL" ? {} : { status: query.status };
-    const [records, total] = await this.prisma.$transaction([
+    const [records, total] = await Promise.all([
       this.prisma.project.findMany({ where, orderBy: [{ lastActivityAt: "desc" }, { id: "desc" }], skip: (query.page - 1) * query.size, take: query.size }),
       this.prisma.project.count({ where })
     ]);
@@ -804,6 +814,21 @@ CreateProjectDto: name 1~100, description optional max 1000, type ProjectType en
 ListProjectsQueryDto: page 기본 1 min 1, size 기본 20 min 1 max 50, status ACTIVE/ARCHIVED/ALL 기본 ACTIVE
 ProjectIdParamDto: projectId UUID
 UpdateProjectDto: name optional 1~100, description optional max 1000
+```
+
+PATCH 요청은 JSON Merge Patch 의미론을 지켜야 하므로 controller에서 원본 body의 key 존재 여부를 확인한다. `description`이 누락되면 기존 값을 유지하고, `description: null`이 명시되면 설명을 비운다.
+
+```ts
+function toProjectUpdateInput(body: UpdateProjectDto, rawBody: Record<string, unknown>) {
+  const input: { name?: string; description?: string | null } = {};
+  if (Object.prototype.hasOwnProperty.call(rawBody, "name")) {
+    input.name = body.name;
+  }
+  if (Object.prototype.hasOwnProperty.call(rawBody, "description")) {
+    input.description = body.description ?? null;
+  }
+  return input;
+}
 ```
 
 - [ ] **Step 2: Presenter 작성**
@@ -859,6 +884,7 @@ Not-tested: HTTP e2e는 다음 Task에서 검증"
 
 **Files:**
 - Create: `test/project-api.e2e-spec.ts`
+- Create: `test/project-api.integration-spec.ts`
 - Modify: `src/project-workspace/project-workspace.module.ts` if provider override support is needed
 - Modify: `src/shared/interface/http-exception.filter.ts` if validation field mapping fails
 
@@ -878,7 +904,7 @@ POST /projects/:projectId/archive 다시 호출: 409 PROJECT_STATE_CONFLICT
 POST /projects/:projectId/restore: ACTIVE
 ```
 
-실제 DB 의존을 피하려면 testing module에서 `PROJECT_REPOSITORY`를 `InMemoryProjectRepository`로 override한다.
+`test/project-api.e2e-spec.ts`는 HTTP 계약과 오류 응답을 빠르게 검증하기 위해 `PROJECT_REPOSITORY`를 `InMemoryProjectRepository`로 override한다. 실제 PostgreSQL 연동은 `test/project-api.integration-spec.ts`에서 별도로 검증해 Prisma query, schema, UUID 저장, DB 제약 조건을 확인한다.
 
 - [ ] **Step 2: e2e 검증**
 
@@ -886,6 +912,7 @@ Run:
 
 ```bash
 npm run test:e2e
+npm run test:integration
 npm run typecheck
 npm run lint
 npm test
@@ -905,10 +932,11 @@ Confidence: medium
 Scope-risk: narrow
 Directive: 새 API도 동일한 공통 오류 응답 shape을 사용한다.
 Tested: npm run test:e2e
+Tested: npm run test:integration
 Tested: npm run typecheck
 Tested: npm run lint
 Tested: npm test
-Not-tested: 원격 PostgreSQL CRUD smoke는 다음 Task에서 검증"
+Not-tested: 운영 배포 환경 smoke는 다음 Task에서 검증"
 ```
 
 ## Task 9: 실행 문서와 원격 DB smoke
