@@ -1,6 +1,6 @@
 # Project API 1차 구현 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 이 문서는 Project API 1차 구현을 작업 단위로 진행하기 위한 실행 계획입니다. 각 단계는 체크박스(`- [ ]`) 기준으로 추적합니다.
 
 **Goal:** NestJS와 Prisma 기반으로 Project Workspace의 프로젝트 생성, 목록, 상세, 수정, 보관, 복원 API를 구현한다.
 
@@ -13,7 +13,7 @@
 ## 기준 문서
 
 - `docs/domain/project-workspace.md`
-- `docs/superpowers/specs/2026-06-29-project-api-design.md`
+- `docs/specs/project-api-design.md`
 
 ## 구현 API
 
@@ -1064,5 +1064,5 @@ Antigravity 리뷰 결과를 확인했습니다.
 ## 자체 리뷰 결과
 
 - Spec coverage: Project 생성, 목록, 상세, 수정, 보관, 복원, status 필터, 보관 정책, demo owner, Prisma schema, 오류 응답, 테스트 전략, 실행 문서가 Task 1~10에 포함되어 있다.
-- 금지어 검색: 계획서 저장 후 `rg -n 'T[B]D|T[O]DO|place.holder|fill[ ]in|나중[에]|적[절]|미[정]|CHANGE[_]ME' docs/superpowers/plans/2026-06-29-project-api-implementation-plan.md`를 실행한다.
+- 금지어 검색: 계획서 저장 후 `rg -n 'T[B]D|T[O]DO|place.holder|fill[ ]in|나중[에]|적[절]|미[정]|CHANGE[_]ME' docs/specs/project-api-implementation-plan.md`를 실행한다.
 - Type consistency: `ProjectType`, `ProjectStatus`, `ProjectSnapshot`, `ProjectRepository`, use case 이름은 모든 Task에서 동일하게 사용한다.
