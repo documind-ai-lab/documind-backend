@@ -22,7 +22,7 @@ Aggregate Root는 `Project`이다.
 
 `Project`는 문서, 대화, 분석 결과, 결정사항, 리스크 후보가 누적되는 업무 맥락 단위다.
 
-프로젝트 이름은 식별자가 아니다. 같은 이름의 프로젝트를 여러 개 만들 수 있으며, 프로젝트의 유일한 식별자는 UUID 기반 `Project.id`이다.
+프로젝트 이름은 식별자가 아니다. 같은 이름의 프로젝트를 여러 개 만들 수 있으며, 프로젝트의 유일한 식별자는 UUID v7 기반 `Project.id`이다.
 
 ## Project Type
 
@@ -51,7 +51,7 @@ Aggregate Root는 `Project`이다.
 
 | 필드 | 설명 |
 | --- | --- |
-| `id` | UUID 기반 프로젝트 식별자 |
+| `id` | UUID v7 기반 프로젝트 식별자 |
 | `ownerId` | UUID 기반 프로젝트 소유자 식별자 |
 | `name` | 프로젝트명 |
 | `description` | 프로젝트 설명 |
@@ -69,7 +69,7 @@ Aggregate Root는 `Project`이다.
 DEFAULT_OWNER_ID = 7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e
 ```
 
-이 값은 도메인 엔티티에 하드코딩하지 않는다. 애플리케이션 설정이나 환경 변수에서 읽어 유스케이스 계층으로 주입하고, `Project` 생성 시에는 이미 결정된 `ownerId` 값을 전달한다. 운영 환경에서는 기본 사용자 ID 설정을 사용하지 않는다. 인증 기능 전 단계의 스테이징/데모 배포가 필요하면 `demo` 프로필에서만 `DOCUMIND_DEMO_OWNER_ID`를 명시적으로 주입한다. 운영 프로필에서 인증 기반 owner provider가 없으면 프로젝트 생성 API를 활성화하지 않는다.
+이 값은 도메인 엔티티에 하드코딩하지 않는다. 애플리케이션 설정이나 환경 변수에서 읽어 유스케이스 계층으로 주입하고, `Project` 생성 시에는 이미 결정된 `ownerId` 값을 전달한다. 운영 환경에서는 기본 사용자 ID 설정을 사용하지 않는다. 인증 기능 전 단계의 스테이징/데모 배포가 필요하면 `demo` 프로필에서만 `DOCUMIND_DEMO_OWNER_ID`를 명시적으로 주입한다. 운영 프로필에서 인증 기반 owner provider가 없으면 프로젝트 생성 요청은 `503 Service Unavailable`과 `PROJECT_OWNER_PROVIDER_UNAVAILABLE` 코드로 거절한다.
 
 ## 생성 규칙
 
@@ -113,7 +113,7 @@ lastActivityAt = now
 
 보관된 프로젝트는 명시적인 필터로 조회한다.
 
-`status` 쿼리 파라미터는 도메인 상태 enum이 아니라 API 조회 필터다. `ACTIVE`와 `ARCHIVED`는 `Project.status` 값과 매핑하고, `ALL`은 컨트롤러/요청 DTO 계층에서만 사용하는 필터 값이다. `ALL`을 `Project.status`에 저장하거나 도메인 상태로 추가하지 않는다.
+`status` 쿼리 파라미터는 도메인 상태 enum이 아니라 API 조회 필터다. `ACTIVE`와 `ARCHIVED`는 `Project.status` 값과 매핑하고, `ALL`은 컨트롤러/요청 DTO 계층에서만 사용하는 필터 값이다. `ALL`을 `Project.status`에 저장하거나 도메인 상태로 추가하지 않는다. `status=ALL`이면 `ACTIVE`와 `ARCHIVED` 프로젝트를 모두 조회한다.
 
 ```http
 GET /projects
@@ -212,7 +212,7 @@ GET /projects?status=ACTIVE&page=1&size=20
 
 `PATCH` 요청에서 `name`이 누락되면 기존 값을 유지한다. `name`이 제공되면 생성 시와 동일하게 앞뒤 공백 제거, 1~100자 검증을 적용한다. `description` 필드가 누락되면 기존 값을 유지한다. `description`이 `null`이거나, 빈 문자열이거나, 공백만 포함하면 `null`로 정규화한다. 값이 있으면 앞뒤 공백을 제거한 문자열로 저장한다.
 
-`PATCH` 요청 DTO는 필드 누락과 명시적 `null` 전달을 구분할 수 있어야 한다. 유스케이스로 전달하기 전에 요청 DTO 또는 매퍼에서 `fieldProvided` 여부를 판별하고, 누락된 필드는 변경 대상에서 제외한다. FastAPI/Pydantic을 사용할 경우 `model_fields_set` 같은 필드 제공 여부 정보를 활용한다.
+`PATCH` 요청 DTO는 필드 누락과 명시적 `null` 전달을 구분할 수 있어야 한다. 유스케이스로 전달하기 전에 요청 DTO 또는 매퍼에서 `fieldProvided` 여부를 판별하고, 누락된 필드는 변경 대상에서 제외한다. 이 요구사항은 특정 프레임워크 기능에 의존하지 않는 API 계약이다.
 
 시스템이 내부 비즈니스 로직으로 갱신하는 필드는 다음과 같다.
 
