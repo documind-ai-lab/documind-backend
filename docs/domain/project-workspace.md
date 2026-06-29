@@ -26,7 +26,7 @@ Aggregate Root는 `Project`이다.
 
 ## Project Type
 
-프로젝트 유형은 고정 선택지로 관리한다. API와 저장소에서는 영문 enum 값을 사용하고, 화면에서는 한국어 라벨을 표시한다.
+프로젝트 유형은 고정 선택지로 관리한다. API와 저장소에서는 영문 enum 값을 사용하고, 화면에서는 클라이언트가 한국어 라벨을 매핑해 표시한다.
 
 | 값 | 라벨 | 의미 |
 | --- | --- | --- |
@@ -68,6 +68,8 @@ Aggregate Root는 `Project`이다.
 ```text
 DEFAULT_OWNER_ID = 7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e
 ```
+
+이 값은 도메인 엔티티에 하드코딩하지 않는다. 애플리케이션 설정이나 환경 변수에서 읽어 유스케이스 계층으로 주입하고, `Project` 생성 시에는 이미 결정된 `ownerId` 값을 전달한다.
 
 ## 생성 규칙
 
@@ -119,9 +121,11 @@ GET /projects?status=ACTIVE&page=1&size=20
 
 1차 MVP의 목록 조회는 offset 기반 페이징을 사용한다. `page`는 1부터 시작하고 기본값은 1이다. `size` 기본값은 20이고 최대값은 50이다.
 
-기본 정렬은 `lastActivityAt DESC, createdAt DESC`이다. 최근 활동한 프로젝트가 가장 위에 오고, 마지막 활동 시각이 같으면 최근 생성된 프로젝트가 먼저 온다.
+`page`가 1보다 작거나 `size`가 1보다 작으면 422 검증 오류를 반환한다. `size`가 50보다 크면 자동 보정하지 않고 422 검증 오류를 반환한다. 파라미터가 누락된 경우에만 기본값을 적용한다.
 
-`lastActivityAt`은 사용자가 프로젝트 업무 맥락을 진전시키는 행동이 성공했을 때 갱신한다. 1차 MVP에서는 프로젝트 생성 시 `now`로 초기화하고, 프로젝트 기본 정보 수정, 보관, 복원만으로는 갱신하지 않는다. 후속 기능에서는 문서 업로드, AI 채팅, 분석 결과 생성, 결정사항 추가, 리스크 후보 추가가 성공했을 때 갱신한다.
+기본 정렬은 `lastActivityAt DESC, createdAt DESC`이다. 최근 활동한 프로젝트가 가장 위에 오고, 마지막 활동 시각이 같으면 최근 생성된 프로젝트가 먼저 온다. 실제 저장소 구현에서는 `status`, `lastActivityAt`, `createdAt` 기준 조회와 정렬을 고려한 복합 인덱스를 검토한다.
+
+`lastActivityAt`은 사용자가 프로젝트 업무 맥락을 진전시키는 행동이 성공했을 때 갱신한다. 1차 MVP에서는 프로젝트 생성 시 `now`로 초기화하고, 프로젝트 기본 정보 수정, 보관, 복원만으로는 갱신하지 않는다. 이는 목록의 최근 활동을 프로젝트 메타데이터 변경이 아니라 실제 업무 진행 기준으로 보여주기 위한 의도된 정책이다. 후속 기능에서는 문서 업로드, AI 채팅, 분석 결과 생성, 결정사항 추가, 리스크 후보 추가가 성공했을 때 갱신한다.
 
 목록 응답은 카드와 테이블 렌더링에 필요한 요약 정보만 담는다.
 
@@ -133,7 +137,6 @@ GET /projects?status=ACTIVE&page=1&size=20
       "name": "A사 제안 검토",
       "description": "2026년 상반기 제안서 및 견적 검토",
       "type": "PROPOSAL_REVIEW",
-      "typeLabel": "제안 검토",
       "status": "ACTIVE",
       "documentCount": 3,
       "riskCandidateCount": 2,
@@ -157,7 +160,6 @@ GET /projects?status=ACTIVE&page=1&size=20
   "name": "A사 제안 검토",
   "description": "2026년 상반기 제안서 및 견적 검토",
   "type": "PROPOSAL_REVIEW",
-  "typeLabel": "제안 검토",
   "status": "ACTIVE",
   "documentCount": 3,
   "riskCandidateCount": 2,
@@ -249,6 +251,6 @@ POST /projects/{projectId}/restore
 - `Decision`
 - `RiskCandidate`
 
-1차 Project API 구현에서는 이 개념들을 직접 구현하지 않는다. 단, `documentCount`, `riskCandidateCount`, `lastActivityAt`처럼 목록과 상세에 필요한 요약 필드는 Project 응답에 포함할 수 있다.
+1차 Project API 구현에서는 이 개념들을 직접 구현하지 않는다. 단, `documentCount`, `riskCandidateCount`, `lastActivityAt`처럼 목록과 상세에 필요한 요약 필드는 Project 응답에 포함할 수 있다. 후속 Aggregate에서 업무 활동이 발생하면 도메인 이벤트나 애플리케이션 서비스 조정을 통해 Project 요약 필드를 갱신하는 방향으로 확장한다.
 
 1차 MVP에서 `documentCount`와 `riskCandidateCount`는 `0`으로 초기화하고, Document/RiskCandidate 기능이 구현되기 전까지 기본값 `0`을 유지한다. 후속 기능에서 실제 문서 수와 리스크 후보 수를 집계해 갱신한다.
