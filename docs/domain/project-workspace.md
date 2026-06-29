@@ -160,18 +160,20 @@ GET /projects?status=ALL
 
 - `name`
 - `description`
-- `type`
 
 수정할 수 없는 필드는 다음과 같다.
 
 - `id`
 - `ownerId`
+- `type`
 - `status`
 - `documentCount`
 - `riskCandidateCount`
 - `createdAt`
 - `updatedAt`
 - `lastActivityAt`
+
+`type`은 프로젝트의 분석 목적과 처리 기준을 결정하는 값이므로 생성 시에만 지정한다. 생성 후 유형 변경이 필요하면 새 프로젝트를 생성하는 흐름으로 처리한다.
 
 프로젝트 상태 변경은 일반 수정 API가 아니라 별도 도메인 액션으로 처리한다.
 
@@ -226,3 +228,5 @@ POST /projects/{projectId}/restore
 - `RiskCandidate`
 
 1차 Project API 구현에서는 이 개념들을 직접 구현하지 않는다. 단, `documentCount`, `riskCandidateCount`, `lastActivityAt`처럼 목록과 상세에 필요한 요약 필드는 Project 응답에 포함할 수 있다.
+
+1차 MVP에서 `documentCount`와 `riskCandidateCount`는 `0`으로 초기화하고, Document/RiskCandidate 기능이 구현되기 전까지 기본값 `0`을 유지한다. 후속 기능에서 실제 문서 수와 리스크 후보 수를 집계해 갱신한다.
