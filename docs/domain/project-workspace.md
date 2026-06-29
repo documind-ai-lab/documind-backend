@@ -66,7 +66,7 @@ Aggregate Root는 `Project`이다.
 1차 MVP에서는 인증/사용자 컨텍스트가 완성되기 전까지 기본 사용자 ID를 사용한다.
 
 ```text
-DEFAULT_OWNER_ID = 00000000-0000-0000-0000-000000000001
+DEFAULT_OWNER_ID = 7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e
 ```
 
 ## 생성 규칙
@@ -83,7 +83,7 @@ DEFAULT_OWNER_ID = 00000000-0000-0000-0000-000000000001
 | `type` | 필수, Project Type 중 하나 |
 | `description` | 선택, 앞뒤 공백 제거, 최대 1000자 |
 
-`description`이 비어 있으면 `null`로 정규화한다.
+생성 요청에서 `description` 필드가 누락되거나, `null`이거나, 빈 문자열이거나, 공백만 포함하면 `null`로 정규화한다. 값이 있으면 앞뒤 공백을 제거한 문자열로 저장한다.
 
 프로젝트 생성 직후 상태는 `ACTIVE`이다.
 
@@ -114,7 +114,10 @@ GET /projects
 GET /projects?status=ACTIVE
 GET /projects?status=ARCHIVED
 GET /projects?status=ALL
+GET /projects?status=ACTIVE&page=1&size=20
 ```
+
+1차 MVP의 목록 조회는 offset 기반 페이징을 사용한다. `page`는 1부터 시작하고 기본값은 1이다. `size` 기본값은 20이고 최대값은 50이다.
 
 기본 정렬은 `lastActivityAt DESC, createdAt DESC`이다. 최근 활동한 프로젝트가 가장 위에 오고, 마지막 활동 시각이 같으면 최근 생성된 프로젝트가 먼저 온다.
 
@@ -124,15 +127,23 @@ GET /projects?status=ALL
 
 ```json
 {
-  "id": "8d5f2c2a-1f1f-4d43-9a58-1e7b5c2f1a91",
-  "name": "A사 제안 검토",
-  "description": "2026년 상반기 제안서 및 견적 검토",
-  "type": "PROPOSAL_REVIEW",
-  "typeLabel": "제안 검토",
-  "status": "ACTIVE",
-  "documentCount": 3,
-  "riskCandidateCount": 2,
-  "lastActivityAt": "2026-06-29T10:00:00+09:00"
+  "items": [
+    {
+      "id": "8d5f2c2a-1f1f-4d43-9a58-1e7b5c2f1a91",
+      "name": "A사 제안 검토",
+      "description": "2026년 상반기 제안서 및 견적 검토",
+      "type": "PROPOSAL_REVIEW",
+      "typeLabel": "제안 검토",
+      "status": "ACTIVE",
+      "documentCount": 3,
+      "riskCandidateCount": 2,
+      "lastActivityAt": "2026-06-29T10:00:00+09:00"
+    }
+  ],
+  "page": 1,
+  "size": 20,
+  "total": 42,
+  "hasNext": true
 }
 ```
 
@@ -158,12 +169,12 @@ GET /projects?status=ALL
 
 ## 수정 규칙
 
-수정 가능한 필드는 다음과 같다.
+클라이언트가 `PATCH /projects/{projectId}` 요청 본문으로 수정 요청할 수 있는 필드는 다음과 같다.
 
 - `name`
 - `description`
 
-수정할 수 없는 필드는 다음과 같다.
+클라이언트가 요청 본문으로 직접 수정할 수 없는 필드는 다음과 같다.
 
 - `id`
 - `ownerId`
@@ -176,6 +187,13 @@ GET /projects?status=ALL
 - `lastActivityAt`
 
 `type`은 프로젝트의 분석 목적과 처리 기준을 결정하는 값이므로 생성 시에만 지정한다. 생성 후 유형 변경이 필요하면 새 프로젝트를 생성하는 흐름으로 처리한다.
+
+`PATCH` 요청에서 `description` 필드가 누락되면 기존 값을 유지한다. `description`이 `null`이거나, 빈 문자열이거나, 공백만 포함하면 `null`로 정규화한다. 값이 있으면 앞뒤 공백을 제거한 문자열로 저장한다.
+
+시스템이 내부 비즈니스 로직으로 갱신하는 필드는 다음과 같다.
+
+- `updatedAt`
+- `lastActivityAt`
 
 `updatedAt`은 사용자가 직접 수정할 수 없지만, 시스템 내부에서 자동 갱신한다. `PATCH /projects/{projectId}`가 성공하면 `updatedAt`은 `now`로 변경한다. `archive`와 `restore`가 성공해도 `updatedAt`은 `now`로 변경한다. 이때 `lastActivityAt`은 변경하지 않는다.
 
