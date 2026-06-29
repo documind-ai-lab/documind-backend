@@ -116,9 +116,9 @@ GET /projects?status=ARCHIVED
 GET /projects?status=ALL
 ```
 
-기본 정렬은 `lastActivityAt DESC`이다. 최근 활동한 프로젝트가 가장 위에 온다.
+기본 정렬은 `lastActivityAt DESC, createdAt DESC`이다. 최근 활동한 프로젝트가 가장 위에 오고, 마지막 활동 시각이 같으면 최근 생성된 프로젝트가 먼저 온다.
 
-`lastActivityAt`은 사용자가 프로젝트 업무 맥락을 진전시키는 행동이 성공했을 때 갱신한다. 1차 MVP에서는 프로젝트 생성 시 `now`로 초기화하고, 프로젝트 기본 정보 수정만으로는 갱신하지 않는다. 후속 기능에서는 문서 업로드, AI 채팅, 분석 결과 생성, 결정사항 추가, 리스크 후보 추가가 성공했을 때 갱신한다.
+`lastActivityAt`은 사용자가 프로젝트 업무 맥락을 진전시키는 행동이 성공했을 때 갱신한다. 1차 MVP에서는 프로젝트 생성 시 `now`로 초기화하고, 프로젝트 기본 정보 수정, 보관, 복원만으로는 갱신하지 않는다. 후속 기능에서는 문서 업로드, AI 채팅, 분석 결과 생성, 결정사항 추가, 리스크 후보 추가가 성공했을 때 갱신한다.
 
 목록 응답은 카드와 테이블 렌더링에 필요한 요약 정보만 담는다.
 
@@ -177,7 +177,7 @@ GET /projects?status=ALL
 
 `type`은 프로젝트의 분석 목적과 처리 기준을 결정하는 값이므로 생성 시에만 지정한다. 생성 후 유형 변경이 필요하면 새 프로젝트를 생성하는 흐름으로 처리한다.
 
-`updatedAt`은 사용자가 직접 수정할 수 없지만, 시스템 내부에서 자동 갱신한다. `PATCH /projects/{projectId}`가 성공하면 `updatedAt`은 `now`로 변경한다. `archive`와 `restore`가 성공해도 `updatedAt`은 `now`로 변경한다.
+`updatedAt`은 사용자가 직접 수정할 수 없지만, 시스템 내부에서 자동 갱신한다. `PATCH /projects/{projectId}`가 성공하면 `updatedAt`은 `now`로 변경한다. `archive`와 `restore`가 성공해도 `updatedAt`은 `now`로 변경한다. 이때 `lastActivityAt`은 변경하지 않는다.
 
 프로젝트 상태 변경은 일반 수정 API가 아니라 별도 도메인 액션으로 처리한다.
 
