@@ -1,7 +1,5 @@
-describe("Project API PostgreSQL integration", () => {
-  const shouldRun = process.env.RUN_DB_INTEGRATION === "true";
-
-  (shouldRun ? it : it.skip)("원격 PostgreSQL 연동 smoke는 실제 .env 설정 후 실행한다", () => {
+describe.skip("Project API PostgreSQL integration placeholder", () => {
+  it("원격 PostgreSQL schema/query/UUID 저장 smoke는 Task 9에서 실제 .env 설정 후 구현한다", () => {
     expect(process.env.DATABASE_URL).toBeDefined();
   });
 });

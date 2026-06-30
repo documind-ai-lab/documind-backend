@@ -2,13 +2,13 @@ import { Transform, Type } from "class-transformer";
 import {
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
   Max,
   MaxLength,
   Min,
-  MinLength
+  ValidateIf
 } from "class-validator";
 import { ProjectStatus } from "../domain/project-status";
 import { ProjectType } from "../domain/project-type";
@@ -20,8 +20,9 @@ export enum ProjectListStatus {
 }
 
 export class CreateProjectDto {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(100)
   name!: string;
 
@@ -53,15 +54,11 @@ export class ListProjectsQueryDto {
   status: ProjectStatus | "ALL" = ProjectStatus.ACTIVE;
 }
 
-export class ProjectIdParamDto {
-  @IsUUID()
-  projectId!: string;
-}
-
 export class UpdateProjectDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
-  @MinLength(1)
+  @IsNotEmpty()
   @MaxLength(100)
   name?: string;
 

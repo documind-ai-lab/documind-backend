@@ -1,4 +1,16 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import {
+  Body,
+  Controller,
+  Get,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Req
+} from "@nestjs/common";
+import { Request } from "express";
 import {
   ArchiveProjectUseCase,
   CreateProjectUseCase,
@@ -11,10 +23,11 @@ import {
 import {
   CreateProjectDto,
   ListProjectsQueryDto,
-  ProjectIdParamDto,
   UpdateProjectDto
 } from "./project.dto";
 import { presentProjectDetail, presentProjectPage } from "./project.presenter";
+
+const projectIdPipe = new ParseUUIDPipe({ errorHttpStatusCode: HttpStatus.BAD_REQUEST });
 
 @Controller("projects")
 export class ProjectController {
@@ -44,41 +57,48 @@ export class ProjectController {
   }
 
   @Get(":projectId")
-  async get(@Param() params: ProjectIdParamDto) {
-    const project = await this.getProjectUseCase.execute(params.projectId);
+  async get(@Param("projectId", projectIdPipe) projectId: string) {
+    const project = await this.getProjectUseCase.execute(projectId);
     return presentProjectDetail(project);
   }
 
   @Patch(":projectId")
-  async update(@Param() params: ProjectIdParamDto, @Body() body: UpdateProjectDto) {
+  async update(
+    @Param("projectId", projectIdPipe) projectId: string,
+    @Body() body: UpdateProjectDto,
+    @Req() request: Request
+  ) {
     const project = await this.updateProjectUseCase.execute(
-      params.projectId,
-      toProjectUpdateCommand(body)
+      projectId,
+      toProjectUpdateCommand(body, request.body)
     );
     return presentProjectDetail(project);
   }
 
   @Post(":projectId/archive")
-  async archive(@Param() params: ProjectIdParamDto) {
-    const project = await this.archiveProjectUseCase.execute(params.projectId);
+  async archive(@Param("projectId", projectIdPipe) projectId: string) {
+    const project = await this.archiveProjectUseCase.execute(projectId);
     return presentProjectDetail(project);
   }
 
   @Post(":projectId/restore")
-  async restore(@Param() params: ProjectIdParamDto) {
-    const project = await this.restoreProjectUseCase.execute(params.projectId);
+  async restore(@Param("projectId", projectIdPipe) projectId: string) {
+    const project = await this.restoreProjectUseCase.execute(projectId);
     return presentProjectDetail(project);
   }
 }
 
-function toProjectUpdateCommand(body: UpdateProjectDto): UpdateProjectCommand {
+function toProjectUpdateCommand(
+  body: UpdateProjectDto,
+  rawBody: Record<string, unknown>
+): UpdateProjectCommand {
   const command: UpdateProjectCommand = {};
 
-  if (Object.prototype.hasOwnProperty.call(body, "name")) {
+  if (Object.prototype.hasOwnProperty.call(rawBody, "name")) {
     command.name = body.name;
   }
 
-  if (Object.prototype.hasOwnProperty.call(body, "description")) {
+  if (Object.prototype.hasOwnProperty.call(rawBody, "description")) {
     command.description = body.description ?? null;
   }
 

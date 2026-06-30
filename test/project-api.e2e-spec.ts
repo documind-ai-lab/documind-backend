@@ -93,12 +93,9 @@ describe("Project API", () => {
 
     await request(app.getHttpServer())
       .get("/projects/not-a-uuid")
-      .expect(HttpStatus.UNPROCESSABLE_ENTITY)
+      .expect(HttpStatus.BAD_REQUEST)
       .expect(({ body }) => {
-        expect(body).toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
-        expect(body.errors).toEqual(
-          expect.arrayContaining([expect.objectContaining({ field: "projectId" })])
-        );
+        expect(body).toMatchObject({ status: 400, code: "BAD_REQUEST" });
       });
 
     await request(app.getHttpServer())
@@ -114,6 +111,54 @@ describe("Project API", () => {
       .expect(HttpStatus.OK)
       .expect(({ body }) => {
         expect(body.description).toBeNull();
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/projects/${projectId}`)
+      .send({ description: " 유지되어야 하는 설명 " })
+      .expect(HttpStatus.OK)
+      .expect(({ body }) => {
+        expect(body.description).toBe("유지되어야 하는 설명");
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/projects/${projectId}`)
+      .send({ name: "  A사 최종 제안 검토  " })
+      .expect(HttpStatus.OK)
+      .expect(({ body }) => {
+        expect(body.name).toBe("A사 최종 제안 검토");
+        expect(body.description).toBe("유지되어야 하는 설명");
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/projects/${projectId}`)
+      .send({})
+      .expect(HttpStatus.OK)
+      .expect(({ body }) => {
+        expect(body.name).toBe("A사 최종 제안 검토");
+        expect(body.description).toBe("유지되어야 하는 설명");
+      });
+
+    await request(app.getHttpServer())
+      .post("/projects")
+      .send({ name: "   ", type: "PROPOSAL_REVIEW" })
+      .expect(HttpStatus.UNPROCESSABLE_ENTITY)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
+        expect(body.errors).toEqual(
+          expect.arrayContaining([expect.objectContaining({ field: "name" })])
+        );
+      });
+
+    await request(app.getHttpServer())
+      .patch(`/projects/${projectId}`)
+      .send({ name: null })
+      .expect(HttpStatus.UNPROCESSABLE_ENTITY)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
+        expect(body.errors).toEqual(
+          expect.arrayContaining([expect.objectContaining({ field: "name" })])
+        );
       });
 
     await request(app.getHttpServer())
