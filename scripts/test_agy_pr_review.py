@@ -107,6 +107,19 @@ class PostReviewCommentTest(unittest.TestCase):
         self.assertEqual(self.calls[-1]["method"], "PATCH")
         self.assertEqual(self.calls[-1]["path"], "repos/documind-ai-lab/documind-backend/issues/comments/1001")
 
+    def test_review_prompt_includes_merge_blocker_termination_policy(self):
+        prompt = agy_pr_review.build_prompt(
+            "documind-ai-lab/documind-backend",
+            "24",
+            "diff --git a/example b/example",
+        )
+
+        self.assertIn("MVP 머지 가능 여부", prompt)
+        self.assertIn("머지 차단 기준", prompt)
+        self.assertIn("후속 이슈 기준", prompt)
+        self.assertIn("추가 머지 차단 항목 없음", prompt)
+        self.assertIn("diff --git a/example b/example", prompt)
+
 
 if __name__ == "__main__":
     unittest.main()
