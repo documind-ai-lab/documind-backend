@@ -41,7 +41,7 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 `storageKey`는 저장소 내부의 논리적 상대 경로이며 다음 형식을 사용한다.
 
 ```text
-projects/{projectId}/documents/{documentId}/{storedName}
+projects/{projectId}/documents/{documentId}/{documentId}.{extension}
 ```
 
 로컬 저장소의 실제 파일 경로는 `DOCUMENT_STORAGE_BASE_PATH`와 `storageKey`를 조합해 만든다.
@@ -50,7 +50,7 @@ projects/{projectId}/documents/{documentId}/{storedName}
 {DOCUMENT_STORAGE_BASE_PATH}/{storageKey}
 ```
 
-로컬 저장 어댑터는 경로 조합 후 canonical path를 계산하고, 계산된 경로가 반드시 `DOCUMENT_STORAGE_BASE_PATH`의 하위 경로인지 확인한다. canonical path가 base path 밖으로 벗어나면 파일 저장을 중단하고 415 오류로 처리한다.
+로컬 저장 어댑터는 경로 조합 후 canonical path를 계산하고, 계산된 경로가 반드시 `DOCUMENT_STORAGE_BASE_PATH`의 하위 경로인지 확인한다. canonical path가 base path 밖으로 벗어나면 파일 저장을 중단하고 400 오류로 처리한다.
 
 `storedName`은 `{documentId}.{extension}` 형식으로 만든다. 이미 `documentId` 디렉터리가 고유하므로 저장 파일명에 별도 UUID를 다시 만들지 않는다. 원본 파일명 충돌은 허용하지만, 저장 파일명은 충돌하지 않아야 한다.
 
@@ -214,10 +214,11 @@ DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 
 3. 스토리지 정리 작업은 `DOCUMENT_STORAGE_BASE_PATH` 아래의 `projects/{projectId}/documents/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 정리 후보로 본다.
 4. 정리 후보 디렉터리는 생성 또는 마지막 수정 시각이 최소 1시간 이상 지난 경우에만 삭제한다.
 5. 정리 작업은 기본적으로 최근 7일 이내 생성 또는 수정된 디렉터리만 스캔한다. 스캔 기간은 운영 설정으로 조정할 수 있다.
-6. 정리 작업은 삭제 전 대상 경로, 디렉터리 시각, 판단 근거를 로그로 남긴다.
-7. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
+6. 정리 작업은 1회 실행당 최대 처리 건수와 실행 타임아웃을 둔다. 기본값은 최대 500건, 최대 5분으로 시작한다.
+7. 정리 작업은 삭제 전 대상 경로, 디렉터리 시각, 판단 근거를 로그로 남긴다.
+8. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
 
-이 정책은 로컬 저장소 기준이다. 후속 객체 스토리지 전환 시에는 같은 개념을 객체 key 정리 작업으로 옮긴다.
+이 정책은 로컬 저장소 기준이다. 후속 객체 스토리지 전환 시에는 같은 개념을 객체 key 정리 작업으로 옮긴다. 문서 수가 늘어나면 파일 시스템 재귀 스캔 대신 업로드 실패 후보를 DB 로그 또는 cleanup candidate 테이블에 남기고 해당 목록을 기준으로 정리한다.
 
 ## Project 요약값 갱신 전략
 
@@ -320,7 +321,7 @@ POST /projects/{projectId}/documents/{documentId}/retry
 
 재시도는 기본적으로 `FAILED` 상태에서만 가능하며, 성공하면 상태를 `TEXT_EXTRACTION_PENDING`으로 되돌린다. 실제 worker 재큐잉은 후속 구현 범위다.
 
-재시도 전에는 DB 트랜잭션을 열기 전에 `storageProvider`와 `storageKey` 기준으로 원본 파일이 실제 저장소에 존재하는지 확인한다. 물리 파일이 없거나 읽을 수 없으면 `TEXT_EXTRACTION_PENDING`으로 되돌리지 않고 재시도 불가능한 상태로 409 오류를 반환한다. 파일 존재 검증이 끝난 뒤 짧은 DB 트랜잭션 안에서 상태를 갱신한다.
+재시도 전에는 DB 트랜잭션을 열기 전에 `storageProvider`와 `storageKey` 기준으로 원본 파일이 실제 저장소에 존재하는지 확인한다. 물리 파일이 없거나 읽을 수 없으면 `TEXT_EXTRACTION_PENDING`으로 되돌리지 않고 재시도 불가능한 상태로 409 오류를 반환한다. 이 경우 Document 상태는 `FAILED`로 유지하고 `failureReason`을 원본 파일 없음 또는 읽기 불가 사유로 갱신한다. 파일 존재 검증이 끝난 뒤 짧은 DB 트랜잭션 안에서 상태를 갱신한다.
 
 후속 텍스트 추출 worker 구현 단계에서는 장시간 정체된 `TEXT_EXTRACTING` 문서도 재시도 대상으로 확장한다. 기준 시간은 30분을 기본값으로 두고, `updatedAt`이 기준 시간보다 오래된 `TEXT_EXTRACTING` 문서는 worker 비정상 종료 가능성이 있는 것으로 간주해 운영자 또는 시스템 재시도를 허용한다.
 
