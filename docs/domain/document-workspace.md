@@ -48,6 +48,8 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 
 로컬 저장소는 1차 MVP 구현 방식이다. 후속 배포나 운영 단계에서 S3, MinIO 같은 객체 스토리지로 교체할 수 있도록 파일 저장은 storage port 뒤에 둔다.
 
+로컬 저장소를 사용하는 동안 `.storage/documents`는 애플리케이션 배포 단위와 분리해 영속 볼륨으로 관리한다. Docker, VM, NAS 환경에 배포할 때는 프로세스 재시작이나 컨테이너 재생성으로 업로드 파일이 사라지지 않도록 볼륨 마운트를 먼저 구성한다.
+
 ## 필드
 
 | 필드 | 설명 |
@@ -67,6 +69,23 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 | `updatedAt` | 마지막 수정 시각 |
 
 `ownerId`는 Project와 같은 소유자 식별자를 사용한다. 1차 MVP에서는 인증/사용자 컨텍스트가 완성되기 전까지 설정 기반 owner provider가 값을 주입한다.
+
+## 권한 정책
+
+Document API는 Project 권한을 기준으로 접근을 판단한다.
+
+1차 MVP에서는 현재 호출자의 `ownerId`가 Project의 `ownerId`와 같아야 Project 문서에 접근할 수 있다. 인증/멤버십 기능이 도입되기 전까지 현재 호출자는 설정 기반 owner provider가 제공한다.
+
+권한 기준은 다음과 같다.
+
+| 작업 | 필요한 권한 |
+| --- | --- |
+| 문서 목록 조회 | Project 읽기 권한 |
+| 문서 상세 조회 | Project 읽기 권한 |
+| 문서 업로드 | Project 쓰기 권한 |
+| 문서 처리 재시도 | Project 쓰기 권한 |
+
+후속 단계에서 프로젝트 멤버십이 도입되면 `ownerId` 비교는 Project membership 정책으로 대체한다.
 
 ## Document Status
 
@@ -97,7 +116,7 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 | 프로젝트 상태 | `ACTIVE` Project에만 업로드할 수 있다 |
 | 파일 크기 | 1바이트 이상, 50MB 이하 |
 | 파일 확장자 | `pdf`, `docx`, `xlsx`, `pptx`, `txt`, `csv` 중 하나 |
-| MIME type | 허용 확장자와 호환되는 MIME type이어야 한다 |
+| MIME type | 확장자별 허용 MIME type 목록과 일치해야 한다 |
 | 원본 파일명 | 비어 있으면 안 되며 저장 전 표시용 이름으로 보존한다 |
 
 허용 파일 타입은 다음과 같다.
@@ -109,11 +128,19 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 | `xlsx` | `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` |
 | `pptx` | `application/vnd.openxmlformats-officedocument.presentationml.presentation` |
 | `txt` | `text/plain` |
-| `csv` | `text/csv`, `application/csv`, `application/vnd.ms-excel` |
+| `csv` | `text/csv`, `application/csv`, `application/vnd.ms-excel`, `text/plain` |
 
 파일 크기 제한은 파일 1개당 50MB이다.
 
 이미지 파일은 1차 MVP 허용 대상이 아니다. 이미지 기반 문서 처리는 OCR이 필요하므로 후속 작업으로 분리한다.
+
+## MIME 검증 기준
+
+1차 MVP에서는 파일 확장자 allowlist와 MIME type allowlist를 함께 검증한다. 확장자는 원본 파일명의 마지막 확장자를 소문자로 정규화해 판단하고, MIME type은 업로드 라이브러리가 전달한 값을 기준으로 판단한다.
+
+MIME type이 비어 있거나 `application/octet-stream`처럼 실제 파일 타입을 알 수 없는 값이면 1차 MVP에서는 허용하지 않고 415 오류로 처리한다. 클라이언트가 잘못된 MIME type을 보내는 경우도 415 오류로 처리한다.
+
+파일 바이너리 시그니처인 Magic Number 검증은 1차 MVP 범위에서 제외한다. 다만 보안 강화 단계에서는 PDF, Office Open XML, 텍스트 계열 파일에 대해 Magic Number 또는 파일 파서 기반 검증을 추가한다.
 
 ## 중복 파일명 정책
 
@@ -139,6 +166,26 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 파일 저장에는 성공했지만 DB 저장에 실패하면 저장된 파일을 삭제해 불일치를 줄인다. 파일 삭제도 실패하면 오류 로그를 남기고 후속 정리 대상이 되도록 한다.
 
 DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 업로드 트랜잭션을 실패로 처리한다. 구현에서는 Document 생성과 Project 요약값 갱신을 같은 DB 트랜잭션 안에서 처리한다.
+
+## 업로드 불일치 정리 정책
+
+파일 시스템과 DB 트랜잭션은 하나의 원자적 트랜잭션으로 묶을 수 없다. 따라서 파일 저장 후 DB 저장 또는 커밋 전에 서버 프로세스가 종료되면 DB 레코드가 없는 잔류 파일이 생길 수 있다.
+
+1차 MVP에서는 별도 `UPLOAD_STARTED` 상태를 추가하지 않는다. 대신 다음 정리 정책을 구현 기준으로 둔다.
+
+1. 업로드 실패 시 현재 요청 안에서 저장 파일 삭제를 먼저 시도한다.
+2. 삭제 실패 또는 프로세스 종료로 남은 파일은 스토리지 정리 작업의 대상으로 둔다.
+3. 스토리지 정리 작업은 `.storage/documents/{projectId}/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 삭제한다.
+4. 정리 작업은 삭제 전 대상 경로와 판단 근거를 로그로 남긴다.
+5. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
+
+이 정책은 로컬 저장소 기준이다. 후속 객체 스토리지 전환 시에는 같은 개념을 객체 key 정리 작업으로 옮긴다.
+
+## Project 요약값 갱신 전략
+
+1차 MVP에서는 Document 생성과 Project 요약값 갱신을 같은 DB 트랜잭션에서 처리한다. 같은 데이터베이스 안에서 문서 업로드 성공 여부와 Project 목록 화면의 요약값을 일관되게 보여주는 것이 우선이기 때문이다.
+
+다만 `Project`와 `Document`는 별도의 Aggregate Root이다. 문서 업로드 동시성이 높아져 Project 레코드 락 경합이나 데드락 가능성이 커지면 `DocumentCreatedEvent`를 발행하고 Project 요약값을 비동기 이벤트 리스너에서 갱신하는 방식으로 전환한다.
 
 ## 목록 조회 규칙
 
@@ -239,6 +286,17 @@ POST /projects/{projectId}/documents/{documentId}/retry
 | 500 | 파일 저장 실패, 서버 설정 오류 |
 
 오류 응답은 Project API와 같은 공통 오류 응답 포맷을 사용한다.
+
+## 운영 확인 사항
+
+문서 업로드 API를 실제 환경에서 사용하기 전 다음 설정을 확인한다.
+
+| 항목 | 확인 기준 |
+| --- | --- |
+| 로컬 저장소 볼륨 | `.storage/documents`가 재시작 후에도 유지되는 영속 볼륨이어야 한다 |
+| 백엔드 multipart 제한 | 파일 1개당 50MB 업로드를 받을 수 있도록 요청 크기 제한을 50MB 이상으로 둔다 |
+| 프록시 업로드 제한 | Nginx 등 앞단 프록시를 사용하면 `client_max_body_size` 같은 제한을 50MB 이상으로 둔다 |
+| UUID v7 생성기 | Project API에서 사용하는 식별자 생성 방식과 같은 UUID v7 생성기를 사용한다 |
 
 ## 제외 범위
 
