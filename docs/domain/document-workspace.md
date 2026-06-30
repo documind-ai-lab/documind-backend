@@ -50,6 +50,8 @@ projects/{projectId}/documents/{documentId}/{storedName}
 {DOCUMENT_STORAGE_BASE_PATH}/{storageKey}
 ```
 
+로컬 저장 어댑터는 경로 조합 후 canonical path를 계산하고, 계산된 경로가 반드시 `DOCUMENT_STORAGE_BASE_PATH`의 하위 경로인지 확인한다. canonical path가 base path 밖으로 벗어나면 파일 저장을 중단하고 415 오류로 처리한다.
+
 `storedName`은 `{documentId}.{extension}` 형식으로 만든다. 이미 `documentId` 디렉터리가 고유하므로 저장 파일명에 별도 UUID를 다시 만들지 않는다. 원본 파일명 충돌은 허용하지만, 저장 파일명은 충돌하지 않아야 한다.
 
 예시는 다음과 같다.
@@ -171,7 +173,7 @@ MIME type이 비어 있으면 415 오류로 처리한다. 클라이언트가 확
 
 `application/octet-stream`은 실제 파일 타입을 알 수 없는 값이므로 기본적으로 허용하지 않는다. 다만 CSV와 TXT는 사용자 OS, 브라우저, 업로드 도구에 따라 `application/octet-stream`으로 전달될 수 있으므로 확장자가 `csv` 또는 `txt`인 경우에만 예외적으로 허용한다.
 
-CSV와 TXT의 `application/octet-stream` 예외는 업로드 편의를 위한 1차 MVP 정책이다. 악성 바이너리를 `.txt`나 `.csv`로 위장할 수 있는 위험이 있으므로, 텍스트 추출 worker 구현 단계에서는 파일 파서 기반 2차 검증과 비정상 바이너리 감지 실패 처리를 추가한다.
+CSV와 TXT의 `application/octet-stream` 예외는 업로드 편의를 위한 1차 MVP 정책이다. 악성 바이너리를 `.txt`나 `.csv`로 위장할 수 있는 위험이 있으므로, 업로드 API는 파일 앞부분에 null byte가 포함되는지 확인하는 최소 텍스트성 검사를 수행한다. 텍스트 추출 worker 구현 단계에서는 파일 파서 기반 2차 검증과 비정상 바이너리 감지 실패 처리를 추가한다.
 
 파일 바이너리 시그니처인 Magic Number 검증은 1차 MVP 범위에서 제외한다. 다만 보안 강화 단계에서는 PDF, Office Open XML, 텍스트 계열 파일에 대해 Magic Number 또는 파일 파서 기반 검증을 추가한다.
 
@@ -211,8 +213,9 @@ DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 
 2. 삭제 실패 또는 프로세스 종료로 남은 파일은 스토리지 정리 작업의 대상으로 둔다.
 3. 스토리지 정리 작업은 `DOCUMENT_STORAGE_BASE_PATH` 아래의 `projects/{projectId}/documents/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 정리 후보로 본다.
 4. 정리 후보 디렉터리는 생성 또는 마지막 수정 시각이 최소 1시간 이상 지난 경우에만 삭제한다.
-5. 정리 작업은 삭제 전 대상 경로, 디렉터리 시각, 판단 근거를 로그로 남긴다.
-6. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
+5. 정리 작업은 기본적으로 최근 7일 이내 생성 또는 수정된 디렉터리만 스캔한다. 스캔 기간은 운영 설정으로 조정할 수 있다.
+6. 정리 작업은 삭제 전 대상 경로, 디렉터리 시각, 판단 근거를 로그로 남긴다.
+7. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
 
 이 정책은 로컬 저장소 기준이다. 후속 객체 스토리지 전환 시에는 같은 개념을 객체 key 정리 작업으로 옮긴다.
 
@@ -232,6 +235,8 @@ WHERE id = :project_id;
 ```
 
 이 쿼리는 Document 생성과 같은 트랜잭션 안에서 실행하되, Project row를 오래 점유하지 않도록 트랜잭션 안에서 외부 파일 I/O나 긴 작업을 수행하지 않는다.
+
+Project 요약값 갱신 중 락 타임아웃이나 데드락이 발생하면 업로드 트랜잭션을 실패로 처리한다. 이 경우 이미 저장된 파일은 업로드 실패 정리 흐름에 따라 삭제를 시도하고, 삭제 실패 시 orphan 정리 대상으로 남긴다.
 
 문서 업로드 동시성이 높아져 Project 레코드 락 경합이나 데드락 가능성이 커지면 `DocumentCreatedEvent`를 발행하고 Project 요약값을 비동기 이벤트 리스너에서 갱신하는 방식으로 전환한다.
 
@@ -315,7 +320,7 @@ POST /projects/{projectId}/documents/{documentId}/retry
 
 재시도는 기본적으로 `FAILED` 상태에서만 가능하며, 성공하면 상태를 `TEXT_EXTRACTION_PENDING`으로 되돌린다. 실제 worker 재큐잉은 후속 구현 범위다.
 
-재시도 전에는 `storageProvider`와 `storageKey` 기준으로 원본 파일이 실제 저장소에 존재하는지 확인한다. 물리 파일이 없거나 읽을 수 없으면 `TEXT_EXTRACTION_PENDING`으로 되돌리지 않고 재시도 불가능한 상태로 409 오류를 반환한다.
+재시도 전에는 DB 트랜잭션을 열기 전에 `storageProvider`와 `storageKey` 기준으로 원본 파일이 실제 저장소에 존재하는지 확인한다. 물리 파일이 없거나 읽을 수 없으면 `TEXT_EXTRACTION_PENDING`으로 되돌리지 않고 재시도 불가능한 상태로 409 오류를 반환한다. 파일 존재 검증이 끝난 뒤 짧은 DB 트랜잭션 안에서 상태를 갱신한다.
 
 후속 텍스트 추출 worker 구현 단계에서는 장시간 정체된 `TEXT_EXTRACTING` 문서도 재시도 대상으로 확장한다. 기준 시간은 30분을 기본값으로 두고, `updatedAt`이 기준 시간보다 오래된 `TEXT_EXTRACTING` 문서는 worker 비정상 종료 가능성이 있는 것으로 간주해 운영자 또는 시스템 재시도를 허용한다.
 
