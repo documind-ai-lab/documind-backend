@@ -232,20 +232,21 @@ def viewer_login(cwd: Path) -> str:
     raise SystemExit("GitHub 사용자 정보에서 login 필드를 찾을 수 없습니다. gh auth status를 확인해주세요.")
 
 
-def post_or_update_comment(repo: str, pr_number: str, body: str, cwd: Path) -> str:
+def post_or_update_comment(repo: str, pr_number: str, body: str, cwd: Path, update_existing: bool = False) -> str:
     login = viewer_login(cwd)
     comments_raw = gh_api(f"repos/{repo}/issues/{pr_number}/comments", cwd, paginate=True, slurp=True)
     comments = flatten_comments(load_json(comments_raw, "GitHub PR 댓글 목록"))
 
-    for comment in comments:
-        user = comment.get("user") or {}
-        comment_body_text = comment.get("body") or ""
-        if user.get("login") == login and comment_body_text.strip().startswith(MARKER):
-            comment_id = comment.get("id")
-            if not comment_id:
-                continue
-            gh_api(f"repos/{repo}/issues/comments/{comment_id}", cwd, method="PATCH", payload={"body": body})
-            return "updated"
+    if update_existing:
+        for comment in comments:
+            user = comment.get("user") or {}
+            comment_body_text = comment.get("body") or ""
+            if user.get("login") == login and comment_body_text.strip().startswith(MARKER):
+                comment_id = comment.get("id")
+                if not comment_id:
+                    continue
+                gh_api(f"repos/{repo}/issues/comments/{comment_id}", cwd, method="PATCH", payload={"body": body})
+                return "updated"
 
     gh_api(f"repos/{repo}/issues/{pr_number}/comments", cwd, method="POST", payload={"body": body})
     return "created"
@@ -257,7 +258,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("pr_number", help="리뷰할 Pull Request 번호")
     parser.add_argument("--repo", help="owner/repo 형식의 저장소명. 생략하면 현재 저장소를 사용합니다.")
-    parser.add_argument("--post", action="store_true", help="리뷰 결과를 PR 댓글로 생성하거나 기존 agy 리뷰 댓글을 갱신합니다.")
+    parser.add_argument("--post", action="store_true", help="리뷰 결과를 새 PR 댓글로 생성합니다.")
+    parser.add_argument("--update-existing", action="store_true", help="기존 agy 리뷰 댓글이 있으면 새 댓글 대신 갱신합니다. --post와 함께 사용합니다.")
     parser.add_argument("--timeout", default="5m", help="agy --print-timeout 값입니다. 기본값: 5m")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"agy에서 사용할 모델을 지정합니다. 기본값: {DEFAULT_MODEL}")
     parser.add_argument("--max-diff-bytes", type=int, default=DEFAULT_MAX_DIFF_BYTES, help="agy에 전달할 PR diff의 최대 UTF-8 바이트 수입니다. 기본값: 300000")
@@ -267,6 +269,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("pr_number는 숫자만 입력해주세요. 예: scripts/agy-pr-review 12")
     if args.repo and not REPO_PATTERN.fullmatch(args.repo):
         parser.error("--repo는 owner/repo 형식이어야 합니다. 예: documind-ai-lab/documind-client")
+    if args.update_existing and not args.post:
+        parser.error("--update-existing은 --post와 함께 사용해주세요.")
 
     return args
 
@@ -293,11 +297,11 @@ def main() -> int:
         body = comment_body(repo, args.pr_number, args.model, review)
 
         if args.post:
-            action = post_or_update_comment(repo, args.pr_number, body, cwd)
+            action = post_or_update_comment(repo, args.pr_number, body, cwd, update_existing=args.update_existing)
             print(f"Antigravity 리뷰 댓글 {action}: {repo}#{args.pr_number}")
         else:
             print(body)
-            print("\n--post 옵션을 추가하면 위 내용을 PR 댓글로 생성하거나 갱신합니다.", file=sys.stderr)
+            print("\n--post 옵션을 추가하면 위 내용을 새 PR 댓글로 생성합니다.", file=sys.stderr)
     except CommandExecutionError as exc:
         sys.stderr.write(exc.format())
         return exc.returncode

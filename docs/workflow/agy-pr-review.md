@@ -23,10 +23,16 @@ Antigravity CLI(`agy`)를 PR 일반 댓글 리뷰어로 사용합니다.
 scripts/agy-pr-review 12
 ```
 
-리뷰 결과를 PR 댓글로 생성하거나 기존 Antigravity 리뷰 댓글을 갱신합니다.
+리뷰 결과를 새 PR 댓글로 생성합니다.
 
 ```bash
 scripts/agy-pr-review 12 --post
+```
+
+기존 Antigravity 리뷰 댓글을 갱신해야 할 때만 `--update-existing`을 함께 사용합니다.
+
+```bash
+scripts/agy-pr-review 12 --post --update-existing
 ```
 
 다른 모델을 사용해야 할 때는 `--model`로 일시적으로 덮어씁니다.
@@ -67,8 +73,10 @@ scripts/agy-pr-review 12 --post --max-diff-bytes 500000
 
 - `agy`는 코드를 수정하지 않고 리뷰 코멘트만 작성하도록 템플릿으로 프롬프트합니다.
 - 기본 모델은 `Gemini 3.1 Pro (High)`이며, 특수한 상황에서만 `--model`로 변경합니다.
-- 댓글에는 `<!-- agy-pr-review -->` 마커를 넣어 같은 PR에서 재실행할 때 기존 댓글을 갱신합니다.
-- 댓글 조회는 GitHub API pagination 결과를 모아 기존 Antigravity 리뷰 댓글을 찾습니다.
+- 댓글에는 `<!-- agy-pr-review -->` 마커를 넣어 Antigravity 리뷰 댓글임을 식별합니다.
+- 기본 동작은 리뷰 실행 이력을 남기기 위해 새 댓글을 생성하는 것입니다.
+- 기존 댓글 갱신은 `--post --update-existing`을 함께 사용한 경우에만 수행합니다.
+- 댓글 갱신 시에는 GitHub API pagination 결과를 모아 기존 Antigravity 리뷰 댓글을 찾습니다.
 - GitHub inline review가 아니라 PR Conversation의 일반 댓글로 남깁니다.
 - 머지 전에는 `agy` 리뷰 결과, 로컬 검증 결과, 남은 리스크를 PR 댓글이나 본문에 남깁니다.
 
@@ -82,4 +90,4 @@ scripts/agy-pr-review 12 --post --max-diff-bytes 500000
 - 댓글을 자를 때 닫는 백틱 공간을 먼저 확보한 뒤 줄 시작의 fenced code block 개수를 기준으로 닫는 백틱을 추가해 렌더링 깨짐을 줄입니다.
 - PR 번호와 저장소명은 실행 전에 간단히 검증합니다.
 - 템플릿 파일은 현재 실행 위치가 아니라 `scripts/agy-pr-review` 파일 위치를 기준으로 찾습니다.
-- 기존 Antigravity 리뷰 댓글은 현재 GitHub 사용자와 `<!-- agy-pr-review -->` 시작 마커가 모두 일치할 때만 갱신합니다.
+- 기존 Antigravity 리뷰 댓글은 `--update-existing`이 켜져 있고, 현재 GitHub 사용자와 `<!-- agy-pr-review -->` 시작 마커가 모두 일치할 때만 갱신합니다.
