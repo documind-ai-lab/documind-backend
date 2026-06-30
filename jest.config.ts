@@ -5,7 +5,7 @@ const config: Config = {
   rootDir: ".",
   testRegex: "^(?!.*\\.(e2e|integration)-spec\\.ts$).*\\.spec\\.ts$",
   testPathIgnorePatterns: ["/node_modules/"],
-  transform: { "^.+\\.(t|j)s$": "ts-jest" },
+  transform: { "^.+\\.(t|j)s$": ["ts-jest", { tsconfig: "tsconfig.spec.json" }] },
   collectCoverageFrom: ["src/**/*.(t|j)s"],
   testEnvironment: "node"
 };

@@ -18,5 +18,6 @@
     "strictPropertyInitialization": true,
     "noImplicitAny": true,
     "strictNullChecks": true
-  }
+  },
+  "include": ["src/**/*.ts"]
 }
