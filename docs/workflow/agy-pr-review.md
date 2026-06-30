@@ -63,7 +63,7 @@ scripts/agy-pr-review 12 --post --max-diff-bytes 500000
 템플릿별 치환값은 다음과 같습니다.
 
 - `templates/agy-review-prompt.md`: `{{repo}}`, `{{pr_number}}`, `{{diff}}`
-- `templates/agy-review-comment.md`: `{{marker}}`, `{{repo}}`, `{{pr_number}}`, `{{generated_at}}`, `{{command}}`, `{{model}}`, `{{review}}`
+- `templates/agy-review-comment.md`: `{{marker}}`, `{{review_round}}`, `{{repo}}`, `{{pr_number}}`, `{{generated_at}}`, `{{command}}`, `{{model}}`, `{{review}}`
 
 알 수 없는 치환값은 오타 방지를 위해 오류로 처리합니다. 템플릿 본문에 중괄호 토큰을 문자 그대로 남겨야 하면 `\{{name}}`처럼 앞에 역슬래시를 붙입니다.
 
@@ -74,8 +74,11 @@ scripts/agy-pr-review 12 --post --max-diff-bytes 500000
 - `agy`는 코드를 수정하지 않고 리뷰 코멘트만 작성하도록 템플릿으로 프롬프트합니다.
 - 기본 모델은 `Gemini 3.1 Pro (High)`이며, 특수한 상황에서만 `--model`로 변경합니다.
 - 댓글에는 `<!-- agy-pr-review -->` 마커를 넣어 Antigravity 리뷰 댓글임을 식별합니다.
+- 댓글 제목은 `Antigravity 1차 리뷰 결과`, `Antigravity 2차 리뷰 결과`처럼 차수를 포함합니다.
 - 기본 동작은 리뷰 실행 이력을 남기기 위해 새 댓글을 생성하는 것입니다.
+- 새 댓글을 생성할 때는 기존 Antigravity 리뷰 댓글 수를 기준으로 다음 차수를 붙입니다.
 - 기존 댓글 갱신은 `--post --update-existing`을 함께 사용한 경우에만 수행합니다.
+- 기존 댓글 갱신 시에는 기존 댓글 제목의 차수를 유지합니다.
 - 댓글 갱신 시에는 GitHub API pagination 결과를 모아 기존 Antigravity 리뷰 댓글을 찾습니다.
 - GitHub inline review가 아니라 PR Conversation의 일반 댓글로 남깁니다.
 - 머지 전에는 `agy` 리뷰 결과, 로컬 검증 결과, 남은 리스크를 PR 댓글이나 본문에 남깁니다.

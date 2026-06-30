@@ -47,6 +47,33 @@ class PostReviewCommentTest(unittest.TestCase):
             )
         return "{}"
 
+    def test_comment_body_includes_review_round_in_title(self):
+        body = agy_pr_review.comment_body(
+            "documind-ai-lab/documind-backend",
+            "24",
+            "Gemini 3.1 Pro (High)",
+            "review text",
+            review_round=2,
+        )
+
+        self.assertIn("## Antigravity 2차 리뷰 결과", body)
+
+    def test_next_review_round_counts_existing_antigravity_comments(self):
+        comments = [
+            {"body": "<!-- agy-pr-review -->\n## Antigravity 리뷰 결과"},
+            {"body": "일반 댓글"},
+            {"body": "<!-- agy-pr-review -->\n## Antigravity 2차 리뷰 결과"},
+        ]
+
+        self.assertEqual(agy_pr_review.next_review_round(comments), 3)
+
+    def test_existing_review_round_is_kept_when_updating_comment(self):
+        comment = {
+            "body": "<!-- agy-pr-review -->\n## Antigravity 3차 리뷰 결과\n\nold review",
+        }
+
+        self.assertEqual(agy_pr_review.existing_review_round(comment, fallback_round=4), 3)
+
     def test_posts_new_comment_by_default_even_when_previous_marker_comment_exists(self):
         agy_pr_review.gh_api = self.fake_gh_api
 
