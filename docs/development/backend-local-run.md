@@ -4,11 +4,11 @@
 
 `.env.example`을 참고해 `.env`를 만든다.
 
-실제 DB 비밀번호는 `.env`에만 저장하고 저장소에는 커밋하지 않는다. 로컬 실행에 필요한 주요 값은 다음과 같다.
+실제 DB 접속 주소와 비밀번호는 `.env`에만 저장하고 저장소에는 커밋하지 않는다. 로컬 실행 문서는 독립 개발 환경을 기준으로 `localhost:5432`를 사용한다.
 
 ```env
-DATABASE_URL="postgresql://documind_backend_app:<app_password>@futur.asuscomm.com:5433/documind?schema=documind_backend"
-MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_password>@futur.asuscomm.com:5433/documind?schema=documind_backend"
+DATABASE_URL="postgresql://documind_backend_app:<app_password>@localhost:5432/documind?schema=documind_backend"
+MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_password>@localhost:5432/documind?schema=documind_backend"
 DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
 NODE_ENV="development"
 PORT="3000"
@@ -23,6 +23,12 @@ DATABASE_URL="$MIGRATION_DATABASE_URL" npm run prisma:migrate:dev -- --name crea
 ```
 
 `prisma:migrate:dev`는 schema 변경 권한이 있는 migration 계정으로 실행한다. 일반 API 서버 실행은 runtime 계정인 `DATABASE_URL`을 사용한다.
+
+계정 권한 기준은 다음과 같다.
+
+- `documind_backend_migrator`: schema 생성/변경, table/index/enum 생성 등 DDL 권한
+- `documind_backend_app`: API 서버 실행에 필요한 select/insert/update 권한
+- 운영 또는 공유 DB 주소는 개인 `.env`에만 기록하고 문서 예시에는 남기지 않는다.
 
 ## 실행
 
