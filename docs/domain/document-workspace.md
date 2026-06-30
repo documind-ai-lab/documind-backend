@@ -32,10 +32,14 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 
 1차 MVP에서는 업로드 파일을 백엔드 서버의 로컬 디렉터리에 저장한다.
 
+파일 저장소의 기본 경로는 환경 변수 `DOCUMENT_STORAGE_BASE_PATH`로 주입한다. 이 값은 절대 경로여야 하며, 애플리케이션은 상대 경로를 그대로 저장소 base path로 사용하지 않는다.
+
+개발 환경에서 `.storage/documents`를 사용하더라도 애플리케이션 시작 시 프로젝트 루트 기준 절대 경로로 해석한 뒤 사용한다. 운영 환경에서는 예를 들어 `/var/lib/documind/documents`처럼 배포 단위와 분리된 절대 경로를 지정한다.
+
 파일 저장 경로는 다음 형식을 사용한다.
 
 ```text
-.storage/documents/{projectId}/{documentId}/{storedName}
+{DOCUMENT_STORAGE_BASE_PATH}/{projectId}/{documentId}/{storedName}
 ```
 
 `storedName`은 `{documentId}.{extension}` 형식으로 만든다. 이미 `documentId` 디렉터리가 고유하므로 저장 파일명에 별도 UUID를 다시 만들지 않는다. 원본 파일명 충돌은 허용하지만, 저장 파일명은 충돌하지 않아야 한다.
@@ -43,12 +47,12 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 예시는 다음과 같다.
 
 ```text
-.storage/documents/8d5f2c2a-1f1f-4d43-9a58-1e7b5c2f1a91/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99.pdf
+/var/lib/documind/documents/8d5f2c2a-1f1f-4d43-9a58-1e7b5c2f1a91/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99.pdf
 ```
 
 로컬 저장소는 1차 MVP 구현 방식이다. 후속 배포나 운영 단계에서 S3, MinIO 같은 객체 스토리지로 교체할 수 있도록 파일 저장은 storage port 뒤에 둔다.
 
-로컬 저장소를 사용하는 동안 `.storage/documents`는 애플리케이션 배포 단위와 분리해 영속 볼륨으로 관리한다. Docker, VM, NAS 환경에 배포할 때는 프로세스 재시작이나 컨테이너 재생성으로 업로드 파일이 사라지지 않도록 볼륨 마운트를 먼저 구성한다.
+로컬 저장소를 사용하는 동안 `DOCUMENT_STORAGE_BASE_PATH`는 애플리케이션 배포 단위와 분리해 영속 볼륨으로 관리한다. Docker, VM, NAS 환경에 배포할 때는 프로세스 재시작이나 컨테이너 재생성으로 업로드 파일이 사라지지 않도록 볼륨 마운트를 먼저 구성한다.
 
 ## 필드
 
@@ -71,6 +75,15 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 `ownerId`는 Project와 같은 소유자 식별자를 사용한다. 1차 MVP에서는 인증/사용자 컨텍스트가 완성되기 전까지 설정 기반 owner provider가 값을 주입한다.
 
 `storedName`과 `storagePath`는 내부 파일 저장 메타데이터다. 구현 시에는 `projectId`, `documentId`, `extension`으로 유도 가능한 값의 중복 저장을 최소화하고, DB에는 조회와 정리에 필요한 최소 필드만 저장한다.
+
+DB 저장 필드와 런타임 유도 필드의 구분은 다음과 같다.
+
+| 구분 | 필드 |
+| --- | --- |
+| DB 저장 필드 | `id`, `projectId`, `ownerId`, `originalName`, `mimeType`, `extension`, `sizeBytes`, `status`, `failureReason`, `createdAt`, `updatedAt` |
+| 런타임 유도 필드 | `storedName`, `storagePath` |
+
+`storedName`은 `id`와 `extension`으로 만들고, `storagePath`는 `DOCUMENT_STORAGE_BASE_PATH`, `projectId`, `id`, `storedName`으로 만든다. 구현상 조회 성능이나 운영 편의를 위해 저장 경로를 물리 컬럼으로 둘 수는 있지만, 기본 원칙은 규칙으로 유도 가능한 값의 중복 저장을 피하는 것이다.
 
 ## 권한 정책
 
@@ -138,11 +151,13 @@ Document API는 Project 권한을 기준으로 접근을 판단한다.
 
 ## MIME 검증 기준
 
-1차 MVP에서는 파일 확장자 allowlist와 MIME type allowlist를 함께 검증한다. 확장자는 원본 파일명의 마지막 확장자를 소문자로 정규화해 판단하고, MIME type은 업로드 라이브러리가 전달한 값을 기준으로 판단한다.
+1차 MVP에서는 파일 확장자 allowlist와 MIME type allowlist를 함께 검증한다. 확장자는 원본 파일명의 마지막 마침표 뒤 값을 소문자로 정규화해 판단하고, MIME type은 업로드 라이브러리가 전달한 값을 기준으로 판단한다.
+
+이중 확장자도 같은 규칙을 적용한다. 예를 들어 `test.pdf.exe`는 `exe` 파일로 판단되어 허용 확장자 검증에서 거부되고, `archive.tar.gz`는 `gz` 파일로 판단되어 거부된다.
 
 MIME type이 비어 있으면 415 오류로 처리한다. 클라이언트가 확장자와 호환되지 않는 MIME type을 보내는 경우도 415 오류로 처리한다.
 
-`application/octet-stream`은 실제 파일 타입을 알 수 없는 값이므로 기본적으로 허용하지 않는다. 다만 CSV와 TXT는 사용자 OS, 브라우저, 업로드 도구에 따라 `application/octet-stream`으로 전달될 수 있으므로 확장자가 `csv` 또는 `txt`이고 파일 크기가 50MB 이하인 경우에만 예외적으로 허용한다.
+`application/octet-stream`은 실제 파일 타입을 알 수 없는 값이므로 기본적으로 허용하지 않는다. 다만 CSV와 TXT는 사용자 OS, 브라우저, 업로드 도구에 따라 `application/octet-stream`으로 전달될 수 있으므로 확장자가 `csv` 또는 `txt`인 경우에만 예외적으로 허용한다.
 
 파일 바이너리 시그니처인 Magic Number 검증은 1차 MVP 범위에서 제외한다. 다만 보안 강화 단계에서는 PDF, Office Open XML, 텍스트 계열 파일에 대해 Magic Number 또는 파일 파서 기반 검증을 추가한다.
 
@@ -179,7 +194,7 @@ DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 
 
 1. 업로드 실패 시 현재 요청 안에서 저장 파일 삭제를 먼저 시도한다.
 2. 삭제 실패 또는 프로세스 종료로 남은 파일은 스토리지 정리 작업의 대상으로 둔다.
-3. 스토리지 정리 작업은 `.storage/documents/{projectId}/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 삭제한다.
+3. 스토리지 정리 작업은 `{DOCUMENT_STORAGE_BASE_PATH}/{projectId}/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 삭제한다.
 4. 정리 작업은 삭제 전 대상 경로와 판단 근거를 로그로 남긴다.
 5. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
 
@@ -190,6 +205,17 @@ DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 
 1차 MVP에서는 Document 생성과 Project 요약값 갱신을 같은 DB 트랜잭션에서 처리한다. 같은 데이터베이스 안에서 문서 업로드 성공 여부와 Project 목록 화면의 요약값을 일관되게 보여주는 것이 우선이기 때문이다.
 
 다만 `Project`와 `Document`는 별도의 Aggregate Root이다. 1차 MVP 구현에서도 파일 저장처럼 오래 걸릴 수 있는 작업을 DB 트랜잭션 밖에서 처리하고, DB 트랜잭션 안에서는 Document 생성과 Project 요약값 갱신만 짧게 수행한다.
+
+Project 요약값 갱신은 조회 후 값 계산 방식이 아니라 원자적 update 방식으로 처리한다. 예시는 다음과 같다.
+
+```sql
+UPDATE projects
+SET document_count = document_count + 1,
+    last_activity_at = :uploaded_at
+WHERE id = :project_id;
+```
+
+이 쿼리는 Document 생성과 같은 트랜잭션 안에서 실행하되, Project row를 오래 점유하지 않도록 트랜잭션 안에서 외부 파일 I/O나 긴 작업을 수행하지 않는다.
 
 문서 업로드 동시성이 높아져 Project 레코드 락 경합이나 데드락 가능성이 커지면 `DocumentCreatedEvent`를 발행하고 Project 요약값을 비동기 이벤트 리스너에서 갱신하는 방식으로 전환한다.
 
@@ -303,7 +329,7 @@ POST /projects/{projectId}/documents/{documentId}/retry
 
 | 항목 | 확인 기준 |
 | --- | --- |
-| 로컬 저장소 볼륨 | `.storage/documents`가 재시작 후에도 유지되는 영속 볼륨이어야 한다 |
+| 로컬 저장소 볼륨 | `DOCUMENT_STORAGE_BASE_PATH`가 절대 경로이며 재시작 후에도 유지되는 영속 볼륨이어야 한다 |
 | 백엔드 multipart 제한 | 파일 1개당 50MB 업로드를 받을 수 있도록 요청 크기 제한을 50MB 이상으로 둔다 |
 | 프록시 업로드 제한 | Nginx 등 앞단 프록시를 사용하면 `client_max_body_size` 같은 제한을 50MB 이상으로 둔다 |
 | UUID v7 생성기 | Project API에서 사용하는 식별자 생성 방식과 같은 UUID v7 생성기를 사용한다 |
