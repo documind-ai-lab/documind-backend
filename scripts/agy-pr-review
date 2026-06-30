@@ -16,6 +16,7 @@ from typing import Any
 MARKER = "<!-- agy-pr-review -->"
 REPO_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 FENCED_CODE_PATTERN = re.compile(r"(?m)^[ \t]*```")
+REVIEW_ROUND_PATTERN = re.compile(r"## Antigravity\s+([0-9]+)차 리뷰 결과")
 MAX_COMMENT_BYTES = 60000
 DEFAULT_MAX_DIFF_BYTES = 300000
 DEFAULT_MODEL = "Gemini 3.1 Pro (High)"
@@ -162,13 +163,14 @@ def truncate_comment_body(body: str) -> str:
     return truncated + suffix
 
 
-def comment_body(repo: str, pr_number: str, model: str, review: str) -> str:
+def comment_body(repo: str, pr_number: str, model: str, review: str, review_round: int = 1) -> str:
     generated_at = dt.datetime.now().astimezone().isoformat(timespec="seconds")
     template = load_template(COMMENT_TEMPLATE_PATH)
     body = render_template(
         template,
         {
             "marker": MARKER,
+            "review_round": str(review_round),
             "repo": repo,
             "pr_number": pr_number,
             "generated_at": generated_at,
@@ -214,6 +216,32 @@ def flatten_comments(raw_comments: Any) -> list[dict]:
     raise SystemExit("GitHub 댓글 목록 응답 형식이 예상과 다릅니다.")
 
 
+def is_antigravity_comment(comment: dict) -> bool:
+    return (comment.get("body") or "").strip().startswith(MARKER)
+
+
+def next_review_round(comments: list[dict]) -> int:
+    return sum(1 for comment in comments if is_antigravity_comment(comment)) + 1
+
+
+def existing_review_round(comment: dict, fallback_round: int) -> int:
+    body = comment.get("body") or ""
+    match = REVIEW_ROUND_PATTERN.search(body)
+    if not match:
+        return fallback_round
+    return int(match.group(1))
+
+
+def antigravity_comment_position(comments: list[dict], target_comment: dict) -> int:
+    position = 0
+    for comment in comments:
+        if is_antigravity_comment(comment):
+            position += 1
+        if comment is target_comment:
+            return max(position, 1)
+    return next_review_round(comments)
+
+
 def viewer_login(cwd: Path) -> str:
     try:
         viewer = load_json(gh_api("user", cwd), "GitHub 사용자 정보")
@@ -232,20 +260,38 @@ def viewer_login(cwd: Path) -> str:
     raise SystemExit("GitHub 사용자 정보에서 login 필드를 찾을 수 없습니다. gh auth status를 확인해주세요.")
 
 
-def post_or_update_comment(repo: str, pr_number: str, body: str, cwd: Path) -> str:
-    login = viewer_login(cwd)
+def fetch_pr_comments(repo: str, pr_number: str, cwd: Path) -> list[dict]:
     comments_raw = gh_api(f"repos/{repo}/issues/{pr_number}/comments", cwd, paginate=True, slurp=True)
-    comments = flatten_comments(load_json(comments_raw, "GitHub PR 댓글 목록"))
+    return flatten_comments(load_json(comments_raw, "GitHub PR 댓글 목록"))
 
+
+def find_existing_review_comment(comments: list[dict], login: str) -> dict | None:
     for comment in comments:
         user = comment.get("user") or {}
-        comment_body_text = comment.get("body") or ""
-        if user.get("login") == login and comment_body_text.strip().startswith(MARKER):
+        if user.get("login") == login and is_antigravity_comment(comment):
+            return comment
+    return None
+
+
+def post_or_update_comment(
+    repo: str,
+    pr_number: str,
+    body: str,
+    cwd: Path,
+    update_existing: bool = False,
+    comments: list[dict] | None = None,
+    login: str | None = None,
+) -> str:
+    login = login or viewer_login(cwd)
+    comments = comments if comments is not None else fetch_pr_comments(repo, pr_number, cwd)
+
+    if update_existing:
+        comment = find_existing_review_comment(comments, login)
+        if comment is not None:
             comment_id = comment.get("id")
-            if not comment_id:
-                continue
-            gh_api(f"repos/{repo}/issues/comments/{comment_id}", cwd, method="PATCH", payload={"body": body})
-            return "updated"
+            if comment_id:
+                gh_api(f"repos/{repo}/issues/comments/{comment_id}", cwd, method="PATCH", payload={"body": body})
+                return "updated"
 
     gh_api(f"repos/{repo}/issues/{pr_number}/comments", cwd, method="POST", payload={"body": body})
     return "created"
@@ -257,7 +303,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("pr_number", help="리뷰할 Pull Request 번호")
     parser.add_argument("--repo", help="owner/repo 형식의 저장소명. 생략하면 현재 저장소를 사용합니다.")
-    parser.add_argument("--post", action="store_true", help="리뷰 결과를 PR 댓글로 생성하거나 기존 agy 리뷰 댓글을 갱신합니다.")
+    parser.add_argument("--post", action="store_true", help="리뷰 결과를 새 PR 댓글로 생성합니다.")
+    parser.add_argument("--update-existing", action="store_true", help="기존 agy 리뷰 댓글이 있으면 새 댓글 대신 갱신합니다. --post와 함께 사용합니다.")
     parser.add_argument("--timeout", default="5m", help="agy --print-timeout 값입니다. 기본값: 5m")
     parser.add_argument("--model", default=DEFAULT_MODEL, help=f"agy에서 사용할 모델을 지정합니다. 기본값: {DEFAULT_MODEL}")
     parser.add_argument("--max-diff-bytes", type=int, default=DEFAULT_MAX_DIFF_BYTES, help="agy에 전달할 PR diff의 최대 UTF-8 바이트 수입니다. 기본값: 300000")
@@ -267,6 +314,8 @@ def parse_args() -> argparse.Namespace:
         parser.error("pr_number는 숫자만 입력해주세요. 예: scripts/agy-pr-review 12")
     if args.repo and not REPO_PATTERN.fullmatch(args.repo):
         parser.error("--repo는 owner/repo 형식이어야 합니다. 예: documind-ai-lab/documind-client")
+    if args.update_existing and not args.post:
+        parser.error("--update-existing은 --post와 함께 사용해주세요.")
 
     return args
 
@@ -290,14 +339,39 @@ def main() -> int:
 
         prompt = build_prompt(repo, args.pr_number, diff)
         review = review_with_agy(prompt, args.timeout, cwd, args.model)
-        body = comment_body(repo, args.pr_number, args.model, review)
+
+        comments: list[dict] = []
+        login = ""
+        review_round = 1
+        if args.post:
+            login = viewer_login(cwd)
+            comments = fetch_pr_comments(repo, args.pr_number, cwd)
+            if args.update_existing:
+                existing_comment = find_existing_review_comment(comments, login)
+                if existing_comment is not None:
+                    fallback_round = antigravity_comment_position(comments, existing_comment)
+                    review_round = existing_review_round(existing_comment, fallback_round)
+                else:
+                    review_round = next_review_round(comments)
+            else:
+                review_round = next_review_round(comments)
+
+        body = comment_body(repo, args.pr_number, args.model, review, review_round=review_round)
 
         if args.post:
-            action = post_or_update_comment(repo, args.pr_number, body, cwd)
+            action = post_or_update_comment(
+                repo,
+                args.pr_number,
+                body,
+                cwd,
+                update_existing=args.update_existing,
+                comments=comments,
+                login=login,
+            )
             print(f"Antigravity 리뷰 댓글 {action}: {repo}#{args.pr_number}")
         else:
             print(body)
-            print("\n--post 옵션을 추가하면 위 내용을 PR 댓글로 생성하거나 갱신합니다.", file=sys.stderr)
+            print("\n--post 옵션을 추가하면 위 내용을 새 PR 댓글로 생성합니다.", file=sys.stderr)
     except CommandExecutionError as exc:
         sys.stderr.write(exc.format())
         return exc.returncode

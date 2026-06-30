@@ -8,10 +8,10 @@ Project API 1차 구현은 `docs/domain/project-workspace.md`에서 확정한 Pr
 
 백엔드는 NestJS 11과 Prisma 6.19 계열을 사용한다. NestJS는 API 서버 구조화와 테스트 구성이 좋고, TypeScript 기반 클라이언트와 타입 관점을 맞추기 쉽다. Prisma는 PostgreSQL schema 기반 모델링, migration, 타입 안전한 저장소 구현에 적합하다. Prisma 7은 generator와 adapter 구성이 달라지는 변경이 있어 1차 MVP에서는 도입하지 않는다.
 
-데이터베이스는 PostgreSQL을 사용한다. 연결 기준은 다음과 같다.
+데이터베이스는 PostgreSQL을 사용한다. 로컬 개발 문서의 기본 연결 기준은 다음과 같다. 운영 또는 공유 DB 주소는 개인 `.env`에만 둔다.
 
-- host: `futur.asuscomm.com`
-- port: `5433`
+- host: `localhost`
+- port: `5432`
 - database: `documind`
 - schema: `documind_backend`
 - runtime user: `documind_backend_app`
@@ -146,8 +146,8 @@ POST /projects/:projectId/restore
 `.env.example`에는 실제 비밀번호를 넣지 않고 변수 이름과 예시만 둔다.
 
 ```env
-DATABASE_URL="postgresql://documind_backend_app:example_app_password@futur.asuscomm.com:5433/documind?schema=documind_backend"
-MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:example_migrator_password@futur.asuscomm.com:5433/documind?schema=documind_backend"
+DATABASE_URL="postgresql://documind_backend_app:<app_password>@localhost:5432/documind?schema=documind_backend"
+MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_password>@localhost:5432/documind?schema=documind_backend"
 DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
 NODE_ENV="development"
 ```

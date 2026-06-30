@@ -248,8 +248,8 @@ export default tseslint.config(
 `.env.example`:
 
 ```env
-DATABASE_URL="postgresql://documind_backend_app:example_app_password@futur.asuscomm.com:5433/documind?schema=documind_backend"
-MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:example_migrator_password@futur.asuscomm.com:5433/documind?schema=documind_backend"
+DATABASE_URL="postgresql://documind_backend_app:<app_password>@localhost:5432/documind?schema=documind_backend"
+MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_password>@localhost:5432/documind?schema=documind_backend"
 DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
 NODE_ENV="development"
 PORT="3000"
@@ -896,7 +896,7 @@ Not-tested: HTTP e2e는 다음 Task에서 검증"
 POST /projects: 201 또는 200 응답, name trim, description trim, count 0
 GET /projects: PageResponse shape
 GET /projects?size=99: 422 VALIDATION_ERROR
-GET /projects/not-a-uuid: 422 VALIDATION_ERROR
+GET /projects/not-a-uuid: 400 BAD_REQUEST
 GET /projects/:projectId 없는 ID: 404 PROJECT_NOT_FOUND
 PATCH /projects/:projectId description null: description null
 POST /projects/:projectId/archive: ARCHIVED
@@ -1051,7 +1051,7 @@ Run:
 npm run typecheck
 npm run lint
 npm test
-rg -n "documind0328|dm_app_|dm_migrator_" .
+rg -n "documind[0-9]{4}|dm[_]app[_]|dm[_]migrator[_]" .
 ```
 
 Expected: typecheck, lint, test exit code 0. 실제 비밀번호 패턴 검색 결과 없음.
