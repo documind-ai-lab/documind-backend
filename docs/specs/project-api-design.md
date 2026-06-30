@@ -146,8 +146,8 @@ POST /projects/:projectId/restore
 `.env.example`에는 실제 비밀번호를 넣지 않고 변수 이름과 예시만 둔다.
 
 ```env
-DATABASE_URL="postgresql://documind_backend_app:example_app_password@localhost:5432/documind?schema=documind_backend"
-MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:example_migrator_password@localhost:5432/documind?schema=documind_backend"
+DATABASE_URL="postgresql://documind_backend_app:<app_password>@localhost:5432/documind?schema=documind_backend"
+MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_password>@localhost:5432/documind?schema=documind_backend"
 DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
 NODE_ENV="development"
 ```

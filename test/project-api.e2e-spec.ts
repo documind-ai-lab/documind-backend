@@ -11,7 +11,7 @@ describe("Project API", () => {
 
   beforeEach(async () => {
     process.env.DATABASE_URL =
-      "postgresql://documind_backend_app:example_app_password@localhost:5432/documind?schema=documind_backend";
+      "postgresql://documind_backend_app:test_password@localhost:5432/documind?schema=documind_backend";
     process.env.DOCUMIND_DEMO_OWNER_ID = "7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e";
 
     const moduleRef = await Test.createTestingModule({

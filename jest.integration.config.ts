@@ -4,7 +4,7 @@ import type { Config } from "jest";
 const config: Config = {
   ...baseConfig,
   testRegex: undefined,
-  testMatch: ["<rootDir>/test/project-api.integration-spec.ts"]
+  testMatch: ["<rootDir>/test/**/*.integration-spec.ts"]
 };
 
 export default config;
