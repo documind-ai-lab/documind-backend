@@ -138,7 +138,7 @@ Document API는 Project 권한을 기준으로 접근을 판단한다.
 | 항목 | 규칙 |
 | --- | --- |
 | 프로젝트 | 존재하는 Project여야 한다 |
-| 경로 식별자 | `projectId`, `documentId`는 UUID v7 형식이어야 한다 |
+| 경로 식별자 | 업로드 API에서는 `projectId`가 UUID v7 형식이어야 한다 |
 | 프로젝트 상태 | `ACTIVE` Project에만 업로드할 수 있다 |
 | 파일 크기 | 1바이트 이상, 50MB 이하 |
 | 파일 확장자 | `pdf`, `docx`, `xlsx`, `pptx`, `txt`, `csv` 중 하나 |
@@ -339,6 +339,8 @@ POST /projects/{projectId}/documents/{documentId}/retry
 ```
 
 `DELETE /projects/{projectId}/documents/{documentId}`는 1차 MVP에서 만들지 않는다. 문서 삭제, 보관, 교체, 버전 관리는 후속 정책으로 분리한다.
+
+목록 조회, 상세 조회, 재시도 API의 경로 식별자인 `projectId`와 `documentId`는 모두 UUID v7 형식이어야 한다.
 
 ## 오류 처리
 
