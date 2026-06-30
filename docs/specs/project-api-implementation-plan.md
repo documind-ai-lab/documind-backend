@@ -1,6 +1,7 @@
 # Project API 1차 구현 Implementation Plan
 
 > 이 문서는 Project API 1차 구현을 작업 단위로 진행하기 위한 실행 계획입니다. 각 단계는 체크박스(`- [ ]`) 기준으로 추적합니다.
+> 이 문서의 커밋 메시지 예시는 과거 실행 계획 기록입니다. 새 커밋은 `docs/workflow/commit-message.md`의 한국어 Conventional Commit 기준을 따릅니다.
 
 **Goal:** NestJS와 Prisma 기반으로 Project Workspace의 프로젝트 생성, 목록, 상세, 수정, 보관, 복원 API를 구현한다.
 
