@@ -36,10 +36,18 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 
 개발 환경에서 `.storage/documents`를 사용하더라도 애플리케이션 시작 시 프로젝트 루트 기준 절대 경로로 해석한 뒤 사용한다. 운영 환경에서는 예를 들어 `/var/lib/documind/documents`처럼 배포 단위와 분리된 절대 경로를 지정한다.
 
-파일 저장 경로는 다음 형식을 사용한다.
+파일 저장은 `storageProvider`와 `storageKey`로 식별한다. 1차 MVP의 `storageProvider`는 `local`이다.
+
+`storageKey`는 저장소 내부의 논리적 상대 경로이며 다음 형식을 사용한다.
 
 ```text
-{DOCUMENT_STORAGE_BASE_PATH}/{projectId}/{documentId}/{storedName}
+projects/{projectId}/documents/{documentId}/{storedName}
+```
+
+로컬 저장소의 실제 파일 경로는 `DOCUMENT_STORAGE_BASE_PATH`와 `storageKey`를 조합해 만든다.
+
+```text
+{DOCUMENT_STORAGE_BASE_PATH}/{storageKey}
 ```
 
 `storedName`은 `{documentId}.{extension}` 형식으로 만든다. 이미 `documentId` 디렉터리가 고유하므로 저장 파일명에 별도 UUID를 다시 만들지 않는다. 원본 파일명 충돌은 허용하지만, 저장 파일명은 충돌하지 않아야 한다.
@@ -47,7 +55,7 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 예시는 다음과 같다.
 
 ```text
-/var/lib/documind/documents/8d5f2c2a-1f1f-4d43-9a58-1e7b5c2f1a91/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99.pdf
+/var/lib/documind/documents/projects/8d5f2c2a-1f1f-4d43-9a58-1e7b5c2f1a91/documents/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99/018f1f4f-85e5-7c9a-b7b8-1d46b67f6b99.pdf
 ```
 
 로컬 저장소는 1차 MVP 구현 방식이다. 후속 배포나 운영 단계에서 S3, MinIO 같은 객체 스토리지로 교체할 수 있도록 파일 저장은 storage port 뒤에 둔다.
@@ -62,8 +70,8 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 | `projectId` | 문서가 속한 Project 식별자 |
 | `ownerId` | 문서 소유자 식별자 |
 | `originalName` | 사용자가 업로드한 원본 파일명 |
-| `storedName` | 서버에 저장된 충돌 방지 파일명 |
-| `storagePath` | 서버 로컬 저장 경로 |
+| `storageProvider` | 파일 저장소 종류. 1차 MVP 기본값은 `local` |
+| `storageKey` | 저장소 내부 논리적 상대 경로 |
 | `mimeType` | 업로드 파일 MIME type |
 | `extension` | 정규화된 파일 확장자 |
 | `sizeBytes` | 파일 크기 |
@@ -74,16 +82,16 @@ Project는 문서의 세부 상태를 직접 관리하지 않는다. Project는 
 
 `ownerId`는 Project와 같은 소유자 식별자를 사용한다. 1차 MVP에서는 인증/사용자 컨텍스트가 완성되기 전까지 설정 기반 owner provider가 값을 주입한다.
 
-`storedName`과 `storagePath`는 내부 파일 저장 메타데이터다. 구현 시에는 `projectId`, `documentId`, `extension`으로 유도 가능한 값의 중복 저장을 최소화하고, DB에는 조회와 정리에 필요한 최소 필드만 저장한다.
+`storageProvider`와 `storageKey`는 내부 파일 저장 메타데이터다. 객체 스토리지 전환, 멀티 스토리지 도입, 저장소 레이아웃 변경 시 과거 파일을 추적할 수 있도록 DB에 저장한다.
 
 DB 저장 필드와 런타임 유도 필드의 구분은 다음과 같다.
 
 | 구분 | 필드 |
 | --- | --- |
-| DB 저장 필드 | `id`, `projectId`, `ownerId`, `originalName`, `mimeType`, `extension`, `sizeBytes`, `status`, `failureReason`, `createdAt`, `updatedAt` |
+| DB 저장 필드 | `id`, `projectId`, `ownerId`, `originalName`, `storageProvider`, `storageKey`, `mimeType`, `extension`, `sizeBytes`, `status`, `failureReason`, `createdAt`, `updatedAt` |
 | 런타임 유도 필드 | `storedName`, `storagePath` |
 
-`storedName`은 `id`와 `extension`으로 만들고, `storagePath`는 `DOCUMENT_STORAGE_BASE_PATH`, `projectId`, `id`, `storedName`으로 만든다. 구현상 조회 성능이나 운영 편의를 위해 저장 경로를 물리 컬럼으로 둘 수는 있지만, 기본 원칙은 규칙으로 유도 가능한 값의 중복 저장을 피하는 것이다.
+`storedName`은 `id`와 `extension`으로 만들고, `storagePath`는 `DOCUMENT_STORAGE_BASE_PATH`와 `storageKey`로 만든다. `storagePath` 같은 로컬 절대 경로는 환경마다 달라질 수 있으므로 DB에 저장하지 않는다.
 
 ## 권한 정책
 
@@ -128,6 +136,7 @@ Document API는 Project 권한을 기준으로 접근을 판단한다.
 | 항목 | 규칙 |
 | --- | --- |
 | 프로젝트 | 존재하는 Project여야 한다 |
+| 경로 식별자 | `projectId`, `documentId`는 UUID v7 형식이어야 한다 |
 | 프로젝트 상태 | `ACTIVE` Project에만 업로드할 수 있다 |
 | 파일 크기 | 1바이트 이상, 50MB 이하 |
 | 파일 확장자 | `pdf`, `docx`, `xlsx`, `pptx`, `txt`, `csv` 중 하나 |
@@ -181,14 +190,14 @@ CSV와 TXT의 `application/octet-stream` 예외는 업로드 편의를 위한 1�
 1. Project 존재 여부를 확인한다.
 2. Project 상태가 `ACTIVE`인지 확인한다.
 3. 파일 크기, 확장자, MIME type을 검증한다.
-4. `Document.id`와 `storedName`을 생성한다.
-5. DB 트랜잭션을 열기 전에 파일을 로컬 저장소에 저장한다.
-6. DB 트랜잭션 안에서 Document 레코드를 `TEXT_EXTRACTION_PENDING` 상태로 생성한다.
+4. `Document.id`, `storedName`, `storageProvider`, `storageKey`를 생성한다.
+5. DB 트랜잭션을 열기 전에 `storageKey` 위치에 파일을 로컬 저장소에 저장한다.
+6. DB 트랜잭션 안에서 Document 레코드를 `TEXT_EXTRACTION_PENDING` 상태로 생성한다. 이때 `storageProvider`와 `storageKey`를 함께 저장한다.
 7. 같은 DB 트랜잭션 안에서 Project의 `documentCount`를 1 증가시킨다.
 8. 같은 DB 트랜잭션 안에서 Project의 `lastActivityAt`을 업로드 성공 시각으로 갱신한다.
 9. DB 트랜잭션 커밋 후 업로드 성공 응답을 반환한다.
 
-파일 저장에는 성공했지만 DB 저장에 실패하면 저장된 파일을 삭제해 불일치를 줄인다. 파일 삭제도 실패하면 오류 로그를 남기고 후속 정리 대상이 되도록 한다.
+파일 저장에는 성공했지만 DB 저장에 실패하면 저장된 파일을 삭제해 불일치를 줄인다. 구현에서는 `try/finally` 또는 트랜잭션 실패 후처리 흐름을 사용해 예외가 발생해도 삭제 시도가 누락되지 않게 한다. 파일 삭제도 실패하면 오류 로그를 남기고 후속 정리 대상이 되도록 한다.
 
 DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 업로드 트랜잭션을 실패로 처리한다. 구현에서는 Document 생성과 Project 요약값 갱신을 같은 DB 트랜잭션 안에서 처리한다. DB 트랜잭션 안에서는 파일 쓰기, 파일 읽기, MIME 재검사 같은 외부 I/O를 수행하지 않는다.
 
@@ -200,7 +209,7 @@ DB 저장에는 성공했지만 Project 요약값 갱신에 실패하면 전체 
 
 1. 업로드 실패 시 현재 요청 안에서 저장 파일 삭제를 먼저 시도한다.
 2. 삭제 실패 또는 프로세스 종료로 남은 파일은 스토리지 정리 작업의 대상으로 둔다.
-3. 스토리지 정리 작업은 `{DOCUMENT_STORAGE_BASE_PATH}/{projectId}/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 정리 후보로 본다.
+3. 스토리지 정리 작업은 `DOCUMENT_STORAGE_BASE_PATH` 아래의 `projects/{projectId}/documents/{documentId}` 경로를 순회하며 DB에 존재하지 않는 `documentId` 디렉터리를 정리 후보로 본다.
 4. 정리 후보 디렉터리는 생성 또는 마지막 수정 시각이 최소 1시간 이상 지난 경우에만 삭제한다.
 5. 정리 작업은 삭제 전 대상 경로, 디렉터리 시각, 판단 근거를 로그로 남긴다.
 6. 정리 작업은 운영 초기에는 수동 관리 명령으로 시작하고, 필요해지면 주기 실행 배치로 전환한다.
@@ -233,10 +242,15 @@ WHERE id = :project_id;
 기본 정렬은 `createdAt DESC, id DESC`이다. 최근 업로드된 문서가 가장 위에 온다.
 
 ```http
-GET /projects/{projectId}/documents
+GET /projects/{projectId}/documents?page=1&size=20
 ```
 
-1차 MVP의 문서 목록 조회는 Project 상세 화면에서 사용하는 범위로 시작한다. Project별 문서 수가 많아지면 `page`, `size` 기반 페이징을 추가한다.
+문서 목록 조회는 1차 MVP부터 offset 기반 페이징을 사용한다. Project API와 같은 규칙을 적용한다.
+
+- `page` 기본값: 1
+- `size` 기본값: 20
+- `size` 최대값: 50
+- 범위 위반: 422 검증 오류
 
 목록 응답 예시는 다음과 같다.
 
@@ -254,11 +268,15 @@ GET /projects/{projectId}/documents
       "createdAt": "2026-06-30T08:00:00Z",
       "updatedAt": "2026-06-30T08:00:00Z"
     }
-  ]
+  ],
+  "page": 1,
+  "size": 20,
+  "total": 1,
+  "hasNext": false
 }
 ```
 
-`storagePath`, `storedName`, `ownerId`는 일반 클라이언트 응답에 노출하지 않는다.
+`storageProvider`, `storageKey`, `storagePath`, `storedName`, `ownerId`는 일반 클라이언트 응답에 노출하지 않는다.
 
 ## 상세 조회 규칙
 
@@ -297,9 +315,11 @@ POST /projects/{projectId}/documents/{documentId}/retry
 
 재시도는 기본적으로 `FAILED` 상태에서만 가능하며, 성공하면 상태를 `TEXT_EXTRACTION_PENDING`으로 되돌린다. 실제 worker 재큐잉은 후속 구현 범위다.
 
-재시도 전에는 원본 파일이 `storagePath` 규칙에 따라 실제 파일 시스템에 존재하는지 확인한다. 물리 파일이 없거나 읽을 수 없으면 `TEXT_EXTRACTION_PENDING`으로 되돌리지 않고 재시도 불가능한 상태로 409 오류를 반환한다.
+재시도 전에는 `storageProvider`와 `storageKey` 기준으로 원본 파일이 실제 저장소에 존재하는지 확인한다. 물리 파일이 없거나 읽을 수 없으면 `TEXT_EXTRACTION_PENDING`으로 되돌리지 않고 재시도 불가능한 상태로 409 오류를 반환한다.
 
 후속 텍스트 추출 worker 구현 단계에서는 장시간 정체된 `TEXT_EXTRACTING` 문서도 재시도 대상으로 확장한다. 기준 시간은 30분을 기본값으로 두고, `updatedAt`이 기준 시간보다 오래된 `TEXT_EXTRACTING` 문서는 worker 비정상 종료 가능성이 있는 것으로 간주해 운영자 또는 시스템 재시도를 허용한다.
+
+후속 worker 운영 단계에서는 30분 이상 정체된 `TEXT_EXTRACTING` 문서를 스케줄러가 `FAILED` 상태로 자동 전환하는 정책도 함께 둔다. 이때 `failureReason`에는 처리 타임아웃임을 기록한다.
 
 ## API 후보
 
@@ -339,6 +359,7 @@ POST /projects/{projectId}/documents/{documentId}/retry
 | 항목 | 확인 기준 |
 | --- | --- |
 | 로컬 저장소 볼륨 | `DOCUMENT_STORAGE_BASE_PATH`가 절대 경로이며 재시작 후에도 유지되는 영속 볼륨이어야 한다 |
+| 다중 서버 공유 스토리지 | API 서버와 worker가 분리되거나 API 서버가 2대 이상이면 `DOCUMENT_STORAGE_BASE_PATH`는 NAS, EFS 같은 공유 볼륨이어야 한다 |
 | 백엔드 multipart 제한 | 파일 1개당 50MB 업로드를 받을 수 있도록 요청 크기 제한을 50MB 이상으로 둔다 |
 | 프록시 업로드 제한 | Nginx 등 앞단 프록시를 사용하면 `client_max_body_size` 같은 제한을 50MB 이상으로 둔다 |
 | UUID v7 생성기 | Project API에서 사용하는 식별자 생성 방식과 같은 UUID v7 생성기를 사용한다 |
