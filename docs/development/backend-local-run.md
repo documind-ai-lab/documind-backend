@@ -12,6 +12,7 @@ MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_passwor
 DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
 NODE_ENV="development"
 PORT="3000"
+RUN_DB_INTEGRATION="false"
 ```
 
 ## 최초 준비
@@ -71,4 +72,10 @@ npm run test:integration
 
 `npm run test:e2e`는 supertest가 임시 HTTP listener를 사용한다. 제한된 샌드박스 환경에서는 권한 제한으로 실패할 수 있으므로, 필요하면 일반 터미널에서 실행한다.
 
-`npm run test:integration`의 실제 PostgreSQL smoke는 `RUN_DB_INTEGRATION=true`와 실제 `.env` 설정이 준비된 뒤 확장한다.
+`npm run test:integration`은 기본값에서 실제 DB 테스트를 실행하지 않고 skip한다. 실제 PostgreSQL round-trip을 확인할 때는 migration이 적용된 DB와 실제 `.env` 설정을 준비한 뒤 다음처럼 실행한다.
+
+```bash
+RUN_DB_INTEGRATION=true npm run test:integration
+```
+
+실제 DB 통합 테스트는 `DATABASE_URL`로 접속하며, 테스트 전후로 통합 테스트 전용 ownerId `11111111-1111-4111-8111-111111111111`에 해당하는 Project 데이터만 정리한다. migration 적용은 schema 변경 권한이 있는 `MIGRATION_DATABASE_URL`로 먼저 실행한다.
