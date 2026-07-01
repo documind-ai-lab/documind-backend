@@ -1,4 +1,8 @@
-export type DomainErrorCode = "PROJECT_NOT_FOUND" | "PROJECT_STATE_CONFLICT" | "VALIDATION_ERROR";
+export type DomainErrorCode =
+  | "PROJECT_NOT_FOUND"
+  | "PROJECT_STATE_CONFLICT"
+  | "DOCUMENT_STATE_CONFLICT"
+  | "VALIDATION_ERROR";
 
 export class DomainError extends Error {
   constructor(
