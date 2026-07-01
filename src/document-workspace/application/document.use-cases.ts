@@ -149,15 +149,17 @@ export class RetryDocumentUseCase {
       command.documentId
     );
     const snapshot = document.snapshot();
+    const now = this.clock.now();
+
+    document.markRetryPending(now);
 
     if (!(await this.storage.exists(snapshot.storageKey))) {
       const reason = "원본 파일을 찾을 수 없습니다.";
-      document.markFailed(reason, this.clock.now());
+      document.markFailed(reason, now);
       await this.repository.save(document);
       return { type: "conflict", document: document.snapshot(), reason };
     }
 
-    document.markRetryPending(this.clock.now());
     await this.repository.save(document);
     return { type: "success", document: document.snapshot() };
   }

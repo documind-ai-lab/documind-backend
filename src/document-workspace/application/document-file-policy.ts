@@ -84,8 +84,8 @@ function validateMimeType(extension: string, mimeType: string): void {
   }
 }
 
-function validateTextLikeContent(extension: string, mimeType: string, buffer: Buffer): void {
-  if (!["csv", "txt"].includes(extension) || mimeType !== "application/octet-stream") {
+function validateTextLikeContent(extension: string, _mimeType: string, buffer: Buffer): void {
+  if (!["csv", "txt"].includes(extension)) {
     return;
   }
 

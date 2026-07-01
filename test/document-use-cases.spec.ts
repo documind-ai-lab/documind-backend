@@ -8,7 +8,8 @@ import {
 import { DocumentStatus } from "../src/document-workspace/domain/document-status";
 import {
   DocumentFileValidationError,
-  DocumentNotFoundError
+  DocumentNotFoundError,
+  DocumentStateConflictError
 } from "../src/document-workspace/domain/document.errors";
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
 import { InMemoryDocumentRepository } from "../src/document-workspace/testing/in-memory-document.repository";
@@ -86,7 +87,7 @@ describe("Document file policy", () => {
     ).toThrow(DocumentFileValidationError);
   });
 
-  it("CSV와 TXT는 octet-stream을 허용하되 null byte가 있으면 거부한다", () => {
+  it("CSV와 TXT는 MIME type과 무관하게 null byte가 있으면 거부한다", () => {
     expect(
       policy.validate({
         originalName: "회의록.txt",
@@ -100,6 +101,15 @@ describe("Document file policy", () => {
       policy.validate({
         originalName: "회의록.txt",
         mimeType: "application/octet-stream",
+        sizeBytes: 12,
+        buffer: Buffer.from([0x41, 0x00, 0x42])
+      })
+    ).toThrow(DocumentFileValidationError);
+
+    expect(() =>
+      policy.validate({
+        originalName: "회의록.txt",
+        mimeType: "text/plain",
         sizeBytes: 12,
         buffer: Buffer.from([0x41, 0x00, 0x42])
       })
@@ -279,6 +289,23 @@ describe("Document use cases", () => {
     expect(saved!.snapshot()).toMatchObject({
       status: DocumentStatus.FAILED,
       failureReason: "원본 파일을 찾을 수 없습니다."
+    });
+  });
+
+  it("retry 불가능 상태에서는 원본 파일이 없어도 상태를 FAILED로 변경하지 않는다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    await storage.remove(document.storageKey);
+
+    const retryUseCase = new RetryDocumentUseCase(repository, storage, accessChecker, new FixedClock(now));
+
+    await expect(
+      retryUseCase.execute({ projectId, ownerId, documentId: document.id })
+    ).rejects.toThrow(DocumentStateConflictError);
+
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+    expect(saved!.snapshot()).toMatchObject({
+      status: DocumentStatus.TEXT_EXTRACTION_PENDING,
+      failureReason: null
     });
   });
 });
