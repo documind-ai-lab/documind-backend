@@ -118,6 +118,9 @@ class PostReviewCommentTest(unittest.TestCase):
         self.assertIn("병합 차단 기준", prompt)
         self.assertIn("후속 이슈 기준", prompt)
         self.assertIn("추가 병합 차단 항목 없음", prompt)
+        self.assertIn("위 4개 섹션만 작성하세요", prompt)
+        self.assertIn("작업 요약", prompt)
+        self.assertIn("작성하지 마세요", prompt)
         self.assertIn("diff --git a/example b/example", prompt)
 
 
