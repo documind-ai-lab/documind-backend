@@ -12,6 +12,7 @@ import { PROJECT_DOCUMENT_SUMMARY_UPDATER } from "../src/document-workspace/appl
 import { DocumentStatus } from "../src/document-workspace/domain/document-status";
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
 import { InMemoryDocumentRepository } from "../src/document-workspace/testing/in-memory-document.repository";
+import { ProjectNotFoundError, ProjectStateConflictError } from "../src/project-workspace/domain/project.errors";
 import { HttpExceptionFilter } from "../src/shared/interface/http-exception.filter";
 
 describe("Document API", () => {
@@ -23,6 +24,7 @@ describe("Document API", () => {
   let repository: InMemoryDocumentRepository;
   let storage: FakeDocumentStorage;
   let idGenerator: FixedIdGenerator;
+  let accessChecker: ConfigurableProjectAccessChecker;
 
   beforeEach(async () => {
     process.env.DATABASE_URL =
@@ -33,9 +35,13 @@ describe("Document API", () => {
 
     repository = new InMemoryDocumentRepository();
     storage = new FakeDocumentStorage();
+    accessChecker = new ConfigurableProjectAccessChecker();
     idGenerator = new FixedIdGenerator([
       "018ff4f0-0000-7000-8000-000000000101",
-      "018ff4f0-0000-7000-8000-000000000102"
+      "018ff4f0-0000-7000-8000-000000000102",
+      "018ff4f0-0000-7000-8000-000000000103",
+      "018ff4f0-0000-7000-8000-000000000104",
+      "018ff4f0-0000-7000-8000-000000000105"
     ]);
 
     const moduleRef = await Test.createTestingModule({
@@ -48,7 +54,7 @@ describe("Document API", () => {
       .overrideProvider(ORPHAN_DOCUMENT_STORAGE)
       .useValue(new FakeOrphanDocumentStorage())
       .overrideProvider(PROJECT_ACCESS_CHECKER)
-      .useValue(new AllowProjectAccessChecker())
+      .useValue(accessChecker)
       .overrideProvider(PROJECT_DOCUMENT_SUMMARY_UPDATER)
       .useValue(new FakeProjectDocumentSummaryUpdater())
       .overrideProvider(CLOCK)
@@ -139,9 +145,25 @@ describe("Document API", () => {
       });
   });
 
-  it("헤더, UUID, 파일 검증 오류를 HTTP 오류로 반환한다", async () => {
+  it("헤더, UUID, 파일 누락과 파일 타입 검증 오류를 HTTP 오류로 반환한다", async () => {
     await request(app.getHttpServer())
       .get(`/projects/${projectId}/documents`)
+      .expect(HttpStatus.UNPROCESSABLE_ENTITY)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
+      });
+
+    await request(app.getHttpServer())
+      .get(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", "not-a-uuid")
+      .expect(HttpStatus.UNPROCESSABLE_ENTITY)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
+      });
+
+    await request(app.getHttpServer())
+      .get(`/projects/${projectId}/documents?size=99`)
+      .set("X-Owner-Id", ownerId)
       .expect(HttpStatus.UNPROCESSABLE_ENTITY)
       .expect(({ body }) => {
         expect(body).toMatchObject({ status: 422, code: "VALIDATION_ERROR" });
@@ -160,11 +182,107 @@ describe("Document API", () => {
     await request(app.getHttpServer())
       .post(`/projects/${projectId}/documents`)
       .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.UNPROCESSABLE_ENTITY);
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
       .attach("file", Buffer.from("binary"), {
         filename: "악성파일.exe",
         contentType: "application/x-msdownload"
       })
       .expect(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.alloc(50 * 1024 * 1024 + 1), {
+        filename: "large.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.PAYLOAD_TOO_LARGE);
+  });
+
+  it("Project 접근 오류와 보관 상태를 HTTP 오류로 반환한다", async () => {
+    accessChecker.readableError = new ProjectNotFoundError(projectId);
+
+    await request(app.getHttpServer())
+      .get(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.NOT_FOUND)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 404, code: "PROJECT_NOT_FOUND" });
+      });
+
+    accessChecker.readableError = undefined;
+    accessChecker.writableError = new ProjectStateConflictError(
+      "ACTIVE 상태의 프로젝트에만 문서를 업로드할 수 있습니다."
+    );
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "proposal.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.CONFLICT)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 409, code: "PROJECT_STATE_CONFLICT" });
+      });
+  });
+
+  it("다른 Project 문서 접근과 retry 충돌을 HTTP 오류로 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "proposal.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    const otherProjectId = "018ff4f0-0000-7000-8000-000000009999";
+
+    await request(app.getHttpServer())
+      .get(`/projects/${otherProjectId}/documents/${documentId}`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.NOT_FOUND)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 404, code: "DOCUMENT_NOT_FOUND" });
+      });
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents/${documentId}/retry`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.CONFLICT)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({ status: 409, code: "DOCUMENT_STATE_CONFLICT" });
+      });
+
+    const aggregate = await repository.findByProjectAndId(projectId, documentId);
+    aggregate?.markFailed("텍스트 추출 실패", now);
+    await repository.save(aggregate!);
+    await storage.remove(aggregate!.snapshot().storageKey);
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents/${documentId}/retry`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.CONFLICT)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          status: 409,
+          code: "CONFLICT",
+          message: "원본 파일을 찾을 수 없습니다."
+        });
+      });
+
+    const saved = await repository.findByProjectAndId(projectId, documentId);
+    expect(saved!.snapshot().failureReason).toBe("원본 파일을 찾을 수 없습니다.");
   });
 });
 
@@ -190,9 +308,21 @@ class FixedIdGenerator implements IdGenerator {
   }
 }
 
-class AllowProjectAccessChecker {
-  async ensureReadableProject(): Promise<void> {}
-  async ensureWritableProject(): Promise<void> {}
+class ConfigurableProjectAccessChecker {
+  readableError?: Error;
+  writableError?: Error;
+
+  async ensureReadableProject(): Promise<void> {
+    if (this.readableError !== undefined) {
+      throw this.readableError;
+    }
+  }
+
+  async ensureWritableProject(): Promise<void> {
+    if (this.writableError !== undefined) {
+      throw this.writableError;
+    }
+  }
 }
 
 class FakeProjectDocumentSummaryUpdater {

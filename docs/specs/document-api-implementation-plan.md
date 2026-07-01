@@ -448,7 +448,7 @@ npm test
 
 e2e 테스트는 빠른 실행을 위해 in-memory repository와 fake storage provider를 override한다.
 
-- [ ] **Step 2: 오류 흐름 테스트**
+- [x] **Step 2: 오류 흐름 테스트**
 
 검증:
 - 잘못된 UUID: 400
@@ -468,7 +468,7 @@ e2e 테스트는 빠른 실행을 위해 in-memory repository와 fake storage pr
 
 `storageProvider`, `storageKey`, `storagePath`, `storedName`, `ownerId`가 응답에 없는지 확인한다.
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 Run:
 
