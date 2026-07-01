@@ -5,7 +5,7 @@
 
 **Goal:** NestJS와 Prisma 기반으로 프로젝트별 문서 업로드, 목록 조회, 상세 조회, 재시도 API를 구현한다.
 
-**Architecture:** 모듈러 모놀리스 안에 `document-workspace` 모듈을 추가한다. Document 도메인은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. Controller는 HTTP multipart와 DTO 검증을 담당하고, Use Case는 repository port, storage port, project access port, clock, id generator에만 의존한다. 1차 MVP의 `ownerId`는 인증 컨텍스트가 아니라 `X-Owner-Id` 헤더 DTO에서 검증해 use case 입력으로 전달한다.
+**Architecture:** 모듈러 모놀리스 안에 `document-workspace` 모듈을 추가한다. Document 도메인은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. Controller는 HTTP multipart와 DTO 검증을 담당하고, Use Case는 repository port, storage port, project access port, project summary update port, clock, id generator에만 의존한다. 1차 MVP의 `ownerId`는 인증 컨텍스트가 아니라 `X-Owner-Id` 헤더 DTO에서 검증해 use case 입력으로 전달한다.
 
 **Tech Stack:** Node.js 20.19 이상, TypeScript 6, NestJS 11, Prisma 6.19, PostgreSQL, Jest 29, Supertest
 
@@ -43,11 +43,13 @@ src/document-workspace/application/document.repository.ts
 src/document-workspace/application/document-storage.ts
 src/document-workspace/application/orphan-document-storage.ts
 src/document-workspace/application/project-access-checker.ts
+src/document-workspace/application/project-document-summary-updater.ts
 src/document-workspace/application/document-file-policy.ts
 src/document-workspace/application/document.use-cases.ts
 src/document-workspace/infrastructure/local-document-storage.ts
 src/document-workspace/infrastructure/prisma-document.repository.ts
 src/document-workspace/infrastructure/prisma-project-access-checker.ts
+src/project-workspace/infrastructure/prisma-project-document-summary-updater.ts
 src/document-workspace/interface/document.dto.ts
 src/document-workspace/interface/document.presenter.ts
 src/document-workspace/interface/document.controller.ts
@@ -210,12 +212,12 @@ npm test -- test/document-use-cases.spec.ts
 - [ ] **Step 1: DocumentRepository port 작성**
 
 필수 메서드:
-- `createWithProjectSummary(document, projectSummaryCommand)`
+- `create(document)`
 - `findByProjectAndId(projectId, documentId)`
 - `listByProject(query)`
 - `save(document)`
 
-`createWithProjectSummary`는 Document 생성과 Project `documentCount`, `lastActivityAt` 갱신을 같은 DB 트랜잭션에서 처리하기 위한 port다.
+`DocumentRepository`는 Document 테이블만 다룬다. Project `documentCount`, `lastActivityAt` 갱신 책임을 가지지 않는다.
 
 - [ ] **Step 2: DocumentStorage port 작성**
 
@@ -232,7 +234,7 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 - `record(storageKey, reason)`
 - `resolve(storageKey)`
 
-파일 저장 성공 후 DB 저장 또는 Project 요약 갱신이 실패했는데 storage remove도 실패하면 `record`를 호출한다.
+파일 저장 성공 후 Document DB 저장이 실패했는데 storage remove도 실패하면 `record`를 호출한다.
 
 이번 구현은 port와 fake 구현, use case 호출 테스트까지만 포함한다. 백그라운드 스케줄러와 실제 정리 명령은 후속 이슈로 분리한다.
 
@@ -244,7 +246,16 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 
 반환값에는 Project ownerId와 Project status 확인 결과를 포함한다.
 
-- [ ] **Step 5: UploadDocumentUseCase 작성**
+- [ ] **Step 5: ProjectDocumentSummaryUpdater port 작성**
+
+필수 메서드:
+- `recordDocumentCreated(projectId, ownerId, occurredAt)`
+
+이 port는 `project-workspace` adapter가 구현한다. `document-workspace`의 repository나 infrastructure adapter가 Project 테이블을 직접 수정하지 않는다.
+
+Project summary는 조회 편의를 위한 denormalized summary다. Document 생성 성공 후 summary 갱신을 요청하되, 실패하면 로그와 후속 reconciliation 대상으로 기록하고 Document 생성 자체를 롤백하지 않는다.
+
+- [ ] **Step 6: UploadDocumentUseCase 작성**
 
 순서:
 1. 입력 ownerId 검증 결과 사용
@@ -252,19 +263,24 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 3. 파일 검증
 4. documentId, storageKey 생성
 5. DB 트랜잭션 전 storage에 파일 저장
-6. Document 생성과 Project 요약값 갱신
-7. 실패 시 저장 파일 삭제 시도
+6. Document 생성
+7. Document 생성 실패 시 저장 파일 삭제 시도
 8. 삭제 실패 시 OrphanDocumentStorage에 정리 대상 기록
+9. Document 생성 성공 후 ProjectDocumentSummaryUpdater 호출
 
-- [ ] **Step 6: List/Get/Retry use case 작성**
+- [ ] **Step 7: List/Get/Retry use case 작성**
 
 목록과 상세는 Project 읽기 권한을 확인한다.
 
 재시도는 `FAILED` 상태와 원본 파일 존재 여부를 확인한다.
 
-원본 파일이 없거나 읽을 수 없으면 Document 상태는 `FAILED`로 유지하고 `failureReason`을 먼저 저장한다. 저장이 성공한 뒤 use case는 `DocumentStateConflictError`를 반환하고, HTTP interface에서 409로 매핑한다. 예외를 먼저 throw해서 `failureReason` 저장이 건너뛰지 않도록 테스트로 고정한다.
+재시도에서 Project가 없거나 ownerId가 다르거나 Document가 해당 Project에 속하지 않으면 404를 반환한다.
 
-- [ ] **Step 7: 검증**
+원본 파일이 없거나 읽을 수 없으면 use case 전체를 감싸는 DB 트랜잭션을 열지 않는다. Document 상태는 `FAILED`로 유지하고 `failureReason`을 repository `save`로 먼저 저장한다. 저장이 성공한 뒤 use case는 예외를 throw하지 않고 `RetryDocumentResult.conflict`를 반환한다. HTTP interface는 해당 result를 409로 매핑한다.
+
+이 경로에서는 예외 기반 rollback에 `failureReason` 저장이 휘말리지 않도록 테스트로 고정한다.
+
+- [ ] **Step 8: 검증**
 
 Run:
 
@@ -272,25 +288,23 @@ Run:
 npm test -- test/document-use-cases.spec.ts
 ```
 
-## Task 5: Prisma repository와 Project access adapter 구현
+## Task 5: Prisma repository와 Project adapter 구현
 
 **Files:**
 - Create: `src/document-workspace/infrastructure/prisma-document.repository.ts`
 - Create: `src/document-workspace/infrastructure/prisma-project-access-checker.ts`
+- Create: `src/project-workspace/infrastructure/prisma-project-document-summary-updater.ts`
 - Modify: `src/document-workspace/document-workspace.module.ts`
 
 - [ ] **Step 1: PrismaDocumentRepository 작성**
 
 `DocumentRepository`를 구현한다.
 
-`createWithProjectSummary`는 Prisma `$transaction`을 사용한다.
+Document record create, list, find, save만 처리한다.
 
-트랜잭션 내부 작업:
-- Document record create
-- Project `documentCount` 원자적 increment
-- Project `lastActivityAt` 갱신
+Project 테이블을 직접 update하지 않는다.
 
-파일 쓰기, 파일 읽기, MIME 재검사는 트랜잭션 내부에서 수행하지 않는다.
+파일 쓰기, 파일 읽기, MIME 재검사는 repository 내부에서 수행하지 않는다.
 
 - [ ] **Step 2: 목록 조회 구현**
 
@@ -308,7 +322,19 @@ Project가 없거나 owner가 다르면 not found로 처리한다.
 
 업로드 시 Project가 `ARCHIVED`이면 409로 처리한다.
 
-- [ ] **Step 4: 검증**
+- [ ] **Step 4: PrismaProjectDocumentSummaryUpdater 작성**
+
+`ProjectDocumentSummaryUpdater`를 구현한다.
+
+구현 위치는 `project-workspace` infrastructure 계층에 둔다.
+
+처리:
+- Project `documentCount` 원자적 increment
+- Project `lastActivityAt` 갱신
+
+이 adapter는 Project Workspace 소유 테이블을 다루며, Document repository가 Project 테이블을 직접 갱신하지 않게 하는 경계 역할을 한다.
+
+- [ ] **Step 5: 검증**
 
 Run:
 
@@ -377,6 +403,8 @@ DTO:
 
 업로드 field 이름은 `file`로 고정한다.
 
+Multer `limits.fileSize`를 `DOCUMENT_MAX_FILE_BYTES`로 설정해 50MB 초과 파일은 애플리케이션 메모리에 로드하기 전에 413으로 차단한다.
+
 controller는 multipart 처리와 DTO 검증만 담당하고, 파일 검증 세부 정책은 use case에 위임한다.
 
 - [ ] **Step 3: presenter 작성**
@@ -431,6 +459,7 @@ e2e 테스트는 빠른 실행을 위해 in-memory repository와 fake storage pr
 - 재시도 불가능 상태: 409
 - `X-Owner-Id` 누락 또는 UUID 형식 오류: 422
 - 다른 Project의 Document ID로 상세 조회: 404
+- 다른 Project의 Document ID로 retry 요청: 404
 - retry 원본 파일 부재 시 `failureReason` 저장 후 409
 
 - [ ] **Step 3: 응답 shape 테스트**

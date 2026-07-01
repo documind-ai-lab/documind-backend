@@ -44,7 +44,7 @@ src/
 - `interface`: NestJS controller, multipart upload 처리, request DTO, response presenter
 - `testing`: 인메모리 repository와 storage fake
 
-도메인 모델은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. 유스케이스는 repository port, storage port, project access port, clock, id generator와 입력으로 전달된 ownerId에 의존한다.
+도메인 모델은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. 유스케이스는 repository port, storage port, project access port, project summary update port, clock, id generator와 입력으로 전달된 ownerId에 의존한다.
 
 ## 모듈 경계
 
@@ -55,9 +55,12 @@ Document Workspace는 Project Workspace와 직접 DB join 중심으로 결합하
 - Project 존재 여부 확인
 - 현재 ownerId가 Project에 접근 가능한지 확인
 - 업로드 시 Project가 `ACTIVE`인지 확인
-- Document 생성 성공 트랜잭션 안에서 Project 요약값 갱신 요청
 
-1차 구현에서는 같은 백엔드 모놀리스 안에서 Project Prisma adapter를 재사용하거나 별도 adapter를 둔다. Document 도메인 모델은 Project 도메인 모델을 직접 import하지 않는다.
+Project 요약값 갱신은 `DocumentRepository`가 직접 처리하지 않는다. `document-workspace`는 Document 생성 성공 후 `ProjectDocumentSummaryUpdater` port를 호출하고, 실제 Project `documentCount`, `lastActivityAt` 갱신 책임은 `project-workspace` adapter가 가진다.
+
+1차 구현에서는 Document 생성과 Project 요약값 갱신을 같은 DB 트랜잭션으로 묶지 않는다. Document 생성이 source of truth이며, Project 요약값은 조회 편의를 위한 denormalized summary로 취급한다. 요약값 갱신 실패는 로그와 후속 reconciliation 대상으로 남기고, Document API가 Project 테이블을 직접 수정하지 않는다.
+
+Document 도메인 모델은 Project 도메인 모델을 직접 import하지 않는다.
 
 ## 데이터 모델
 
@@ -94,7 +97,9 @@ projects/{projectId}/documents/{documentId}/{documentId}.{extension}
 
 로컬 저장 adapter는 `DOCUMENT_STORAGE_BASE_PATH`와 `storageKey`를 조합한 뒤 canonical path를 계산한다. 계산된 경로가 base path 밖이면 저장을 중단하고 400 오류로 처리한다.
 
-파일 쓰기는 DB 트랜잭션을 열기 전에 수행한다. DB 저장이나 Project 요약값 갱신에 실패하면 저장한 파일 삭제를 시도한다. 삭제 실패는 로그를 남기고 후속 정리 대상으로 둔다.
+파일 쓰기는 DB 트랜잭션을 열기 전에 수행한다. Document DB 저장에 실패하면 저장한 파일 삭제를 시도한다. 삭제 실패는 로그를 남기고 후속 정리 대상으로 둔다.
+
+Project 요약값 갱신은 Document 생성 성공 후 별도 port 호출로 처리한다. 요약값 갱신 실패는 Document 생성 롤백 사유로 삼지 않는다.
 
 파일 시스템과 DB는 원자적 트랜잭션으로 묶을 수 없으므로, orphan file 정리는 별도 use case 또는 관리 명령으로 분리한다. 이번 구현 계획에는 정리 정책의 port와 테스트 기준까지만 포함하고, 자동 스케줄러는 후속 범위로 둔다.
 
@@ -170,8 +175,8 @@ POST /projects/:projectId/documents/:documentId/retry
 2. Document가 해당 Project에 속하는지 확인한다.
 3. Document가 `FAILED` 상태인지 확인한다.
 4. storage `exists` 결과가 실패이면 Document를 `FAILED`로 유지하고 `failureReason`을 갱신한다.
-5. repository `save`가 성공한 뒤 use case가 `DocumentStateConflictError`를 반환한다.
-6. HTTP interface는 해당 domain error를 409 응답으로 매핑한다.
+5. repository `save`가 성공한 뒤 use case가 `RetryDocumentResult.conflict`를 반환한다.
+6. HTTP interface는 conflict result를 409 응답으로 매핑한다.
 
 성공하면 상태를 `TEXT_EXTRACTION_PENDING`으로 되돌린다. 실제 worker 재큐잉은 후속 범위다.
 
