@@ -5,11 +5,18 @@ import { CLOCK, Clock } from "../src/shared/application/clock";
 import { ID_GENERATOR, IdGenerator } from "../src/shared/application/id-generator";
 import { DocumentWorkspaceModule } from "../src/document-workspace/document-workspace.module";
 import { DOCUMENT_REPOSITORY } from "../src/document-workspace/application/document.repository";
+import {
+  DOCUMENT_SECURITY_SCANNER,
+  DocumentSecurityScanInput,
+  DocumentSecurityScanResult,
+  DocumentSecurityScanner
+} from "../src/document-workspace/application/document-security-scanner";
 import { DOCUMENT_STORAGE } from "../src/document-workspace/application/document-storage";
 import { ORPHAN_DOCUMENT_STORAGE } from "../src/document-workspace/application/orphan-document-storage";
 import { PROJECT_ACCESS_CHECKER } from "../src/document-workspace/application/project-access-checker";
 import { PROJECT_DOCUMENT_SUMMARY_UPDATER } from "../src/document-workspace/application/project-document-summary-updater";
 import { DocumentStatus } from "../src/document-workspace/domain/document-status";
+import { DocumentSecurityScanUnavailableError } from "../src/document-workspace/domain/document.errors";
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
 import { InMemoryDocumentRepository } from "../src/document-workspace/testing/in-memory-document.repository";
 import { ProjectNotFoundError, ProjectStateConflictError } from "../src/project-workspace/domain/project.errors";
@@ -25,6 +32,7 @@ describe("Document API", () => {
   let storage: FakeDocumentStorage;
   let idGenerator: FixedIdGenerator;
   let accessChecker: ConfigurableProjectAccessChecker;
+  let securityScanner: FakeDocumentSecurityScanner;
 
   beforeEach(async () => {
     process.env.DATABASE_URL =
@@ -36,6 +44,7 @@ describe("Document API", () => {
     repository = new InMemoryDocumentRepository();
     storage = new FakeDocumentStorage();
     accessChecker = new ConfigurableProjectAccessChecker();
+    securityScanner = new FakeDocumentSecurityScanner();
     idGenerator = new FixedIdGenerator([
       "018ff4f0-0000-7000-8000-000000000101",
       "018ff4f0-0000-7000-8000-000000000102",
@@ -51,6 +60,8 @@ describe("Document API", () => {
       .useValue(repository)
       .overrideProvider(DOCUMENT_STORAGE)
       .useValue(storage)
+      .overrideProvider(DOCUMENT_SECURITY_SCANNER)
+      .useValue(securityScanner)
       .overrideProvider(ORPHAN_DOCUMENT_STORAGE)
       .useValue(new FakeOrphanDocumentStorage())
       .overrideProvider(PROJECT_ACCESS_CHECKER)
@@ -207,6 +218,51 @@ describe("Document API", () => {
       .expect(HttpStatus.PAYLOAD_TOO_LARGE);
   });
 
+  it("보안 검사에서 감염 의심 파일이면 FAILED 응답을 반환하고 저장소 필드는 노출하지 않는다", async () => {
+    securityScanner.result = { status: "infected", reason: "Eicar-Test-Signature" };
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "proposal.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.CREATED)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: "018ff4f0-0000-7000-8000-000000000101",
+          projectId,
+          originalName: "proposal.pdf",
+          status: DocumentStatus.FAILED,
+          failureReason: "Eicar-Test-Signature"
+        });
+        expect(body).not.toHaveProperty("ownerId");
+        expect(body).not.toHaveProperty("storageProvider");
+        expect(body).not.toHaveProperty("storageKey");
+      });
+  });
+
+  it("보안 검사를 완료할 수 없으면 503 오류를 반환한다", async () => {
+    securityScanner.error = new DocumentSecurityScanUnavailableError();
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "proposal.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.SERVICE_UNAVAILABLE)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          status: 503,
+          code: "DOCUMENT_SECURITY_SCAN_UNAVAILABLE",
+          message: "파일 보안 검사를 완료할 수 없습니다."
+        });
+      });
+  });
+
   it("Project 접근 오류와 보관 상태를 HTTP 오류로 반환한다", async () => {
     accessChecker.readableError = new ProjectNotFoundError(projectId);
 
@@ -327,6 +383,22 @@ class ConfigurableProjectAccessChecker {
 
 class FakeProjectDocumentSummaryUpdater {
   async recordDocumentCreated(): Promise<void> {}
+}
+
+class FakeDocumentSecurityScanner implements DocumentSecurityScanner {
+  readonly inputs: DocumentSecurityScanInput[] = [];
+  result: DocumentSecurityScanResult = { status: "clean" };
+  error: Error | null = null;
+
+  async scan(input: DocumentSecurityScanInput): Promise<DocumentSecurityScanResult> {
+    this.inputs.push(input);
+
+    if (this.error !== null) {
+      throw this.error;
+    }
+
+    return this.result;
+  }
 }
 
 class FakeOrphanDocumentStorage {

@@ -205,7 +205,7 @@ npm test -- test/document-use-cases.spec.ts --runInBand
 
 Expected: PASS.
 
-- [ ] **Step 7: 커밋**
+- [x] **Step 7: 커밋**
 
 ```bash
 git add src/document-workspace/application/document.use-cases.ts src/document-workspace/document-workspace.module.ts test/document-use-cases.spec.ts
@@ -217,13 +217,13 @@ git commit -m "feat: Document 업로드 보안 검사 흐름 구현"
 **Files:**
 - Modify: `test/document-api.e2e-spec.ts`
 
-- [ ] **Step 1: e2e fake scanner provider 추가**
+- [x] **Step 1: e2e fake scanner provider 추가**
 
 `DocumentWorkspaceModule` override에서 `DOCUMENT_SECURITY_SCANNER`를 fake scanner로 교체할 수 있게 한다.
 
 기존 e2e 성공 테스트는 fake scanner 기본값을 clean으로 둔다.
 
-- [ ] **Step 2: infected e2e 테스트 작성**
+- [x] **Step 2: infected e2e 테스트 작성**
 
 업로드 요청이 infected 결과를 받으면 다음을 검증한다.
 
@@ -232,7 +232,7 @@ git commit -m "feat: Document 업로드 보안 검사 흐름 구현"
 - response `failureReason`: 보안 검사 실패 사유 포함
 - response에 `storageKey`, `storageProvider`, `ownerId` 없음
 
-- [ ] **Step 3: unavailable e2e 테스트 작성**
+- [x] **Step 3: unavailable e2e 테스트 작성**
 
 scanner unavailable이면 다음을 검증한다.
 
@@ -240,7 +240,7 @@ scanner unavailable이면 다음을 검증한다.
 - response `code`: `DOCUMENT_SECURITY_SCAN_UNAVAILABLE`
 - response `message`: `파일 보안 검사를 완료할 수 없습니다.`
 
-- [ ] **Step 4: e2e 테스트 실행**
+- [x] **Step 4: e2e 테스트 실행**
 
 Run:
 
