@@ -1,5 +1,10 @@
 import { DocumentFilePolicy } from "../src/document-workspace/application/document-file-policy";
 import {
+  DocumentSecurityScanInput,
+  DocumentSecurityScanResult,
+  DocumentSecurityScanner
+} from "../src/document-workspace/application/document-security-scanner";
+import {
   GetDocumentUseCase,
   ListDocumentsUseCase,
   RetryDocumentUseCase,
@@ -9,6 +14,7 @@ import { DocumentStatus } from "../src/document-workspace/domain/document-status
 import {
   DocumentFileValidationError,
   DocumentNotFoundError,
+  DocumentSecurityScanUnavailableError,
   DocumentStateConflictError
 } from "../src/document-workspace/domain/document.errors";
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
@@ -127,6 +133,7 @@ describe("Document use cases", () => {
   let orphanStorage: FakeOrphanDocumentStorage;
   let accessChecker: FakeProjectAccessChecker;
   let summaryUpdater: FakeProjectDocumentSummaryUpdater;
+  let securityScanner: FakeDocumentSecurityScanner;
   let logger: FakeApplicationLogger;
   let idGenerator: FixedIdGenerator;
   let uploadUseCase: UploadDocumentUseCase;
@@ -137,6 +144,7 @@ describe("Document use cases", () => {
     orphanStorage = new FakeOrphanDocumentStorage();
     accessChecker = new FakeProjectAccessChecker();
     summaryUpdater = new FakeProjectDocumentSummaryUpdater();
+    securityScanner = new FakeDocumentSecurityScanner();
     logger = new FakeApplicationLogger();
     idGenerator = new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000101"]);
     uploadUseCase = new UploadDocumentUseCase(
@@ -145,6 +153,7 @@ describe("Document use cases", () => {
       orphanStorage,
       accessChecker,
       summaryUpdater,
+      securityScanner,
       new DocumentFilePolicy({ maxFileBytes: 50 * 1024 * 1024 }),
       new FixedClock(now),
       idGenerator,
@@ -200,6 +209,53 @@ describe("Document use cases", () => {
         reason: "DOCUMENT_CREATE_FAILED_CLEANUP_FAILED"
       }
     ]);
+    expect(summaryUpdater.createdRequests).toEqual([]);
+  });
+
+  it("보안 검사에서 감염 의심 파일이면 원본을 저장하지 않고 FAILED Document를 기록한다", async () => {
+    securityScanner.result = { status: "infected", reason: "Eicar-Test-Signature" };
+
+    const document = await uploadUseCase.execute({
+      projectId,
+      ownerId,
+      file: pdfFile()
+    });
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+
+    expect(document).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "Eicar-Test-Signature",
+      storageKey:
+        "projects/018ff4f0-0000-7000-8000-000000000001/documents/018ff4f0-0000-7000-8000-000000000101/018ff4f0-0000-7000-8000-000000000101.pdf"
+    });
+    expect(saved?.snapshot()).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "Eicar-Test-Signature"
+    });
+    await expect(storage.exists(document.storageKey)).resolves.toBe(false);
+    expect(securityScanner.inputs).toHaveLength(1);
+    expect(summaryUpdater.createdRequests).toEqual([{ projectId, ownerId, occurredAt: now }]);
+  });
+
+  it("보안 검사를 완료할 수 없으면 문서와 파일을 만들지 않고 오류를 전파한다", async () => {
+    securityScanner.error = new DocumentSecurityScanUnavailableError();
+
+    await expect(
+      uploadUseCase.execute({
+        projectId,
+        ownerId,
+        file: pdfFile()
+      })
+    ).rejects.toThrow(DocumentSecurityScanUnavailableError);
+
+    await expect(
+      repository.findByProjectAndId(projectId, "018ff4f0-0000-7000-8000-000000000101")
+    ).resolves.toBeNull();
+    await expect(
+      storage.exists(
+        "projects/018ff4f0-0000-7000-8000-000000000001/documents/018ff4f0-0000-7000-8000-000000000101/018ff4f0-0000-7000-8000-000000000101.pdf"
+      )
+    ).resolves.toBe(false);
     expect(summaryUpdater.createdRequests).toEqual([]);
   });
 
@@ -365,6 +421,22 @@ class FakeProjectDocumentSummaryUpdater {
     }
 
     this.createdRequests.push({ projectId, ownerId, occurredAt });
+  }
+}
+
+class FakeDocumentSecurityScanner implements DocumentSecurityScanner {
+  readonly inputs: DocumentSecurityScanInput[] = [];
+  result: DocumentSecurityScanResult = { status: "clean" };
+  error: Error | null = null;
+
+  async scan(input: DocumentSecurityScanInput): Promise<DocumentSecurityScanResult> {
+    this.inputs.push(input);
+
+    if (this.error !== null) {
+      throw this.error;
+    }
+
+    return this.result;
   }
 }
 

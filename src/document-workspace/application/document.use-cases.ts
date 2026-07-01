@@ -6,6 +6,7 @@ import { Document, DocumentSnapshot } from "../domain/document";
 import { DocumentNotFoundError } from "../domain/document.errors";
 import { DocumentFileInput, DocumentFilePolicy } from "./document-file-policy";
 import { DocumentRepository } from "./document.repository";
+import { DocumentSecurityScanner } from "./document-security-scanner";
 import { DocumentStorage } from "./document-storage";
 import { OrphanDocumentStorage } from "./orphan-document-storage";
 import { ProjectAccessChecker } from "./project-access-checker";
@@ -43,6 +44,7 @@ export class UploadDocumentUseCase {
     private readonly orphanStorage: OrphanDocumentStorage,
     private readonly accessChecker: ProjectAccessChecker,
     private readonly summaryUpdater: ProjectDocumentSummaryUpdater,
+    private readonly securityScanner: DocumentSecurityScanner,
     private readonly filePolicy: DocumentFilePolicy,
     private readonly clock: Clock,
     private readonly idGenerator: IdGenerator,
@@ -56,7 +58,7 @@ export class UploadDocumentUseCase {
     const documentId = this.idGenerator.nextId();
     const storageKey = buildStorageKey(command.projectId, documentId, file.extension);
     const now = this.clock.now();
-    const document = Document.create({
+    const baseDocumentInput = {
       id: documentId,
       projectId: command.projectId,
       ownerId: command.ownerId,
@@ -67,7 +69,26 @@ export class UploadDocumentUseCase {
       extension: file.extension,
       sizeBytes: file.sizeBytes,
       now
+    };
+    const scanResult = await this.securityScanner.scan({
+      documentId,
+      originalName: file.originalName,
+      mimeType: file.mimeType,
+      extension: file.extension,
+      sizeBytes: file.sizeBytes,
+      buffer: file.buffer
     });
+
+    const document =
+      scanResult.status === "infected"
+        ? Document.createFailed({ ...baseDocumentInput, failureReason: scanResult.reason })
+        : Document.create(baseDocumentInput);
+
+    if (scanResult.status === "infected") {
+      await this.repository.create(document);
+      await this.recordProjectSummary(command.projectId, command.ownerId, now);
+      return document.snapshot();
+    }
 
     await this.storage.put(storageKey, file.buffer);
 

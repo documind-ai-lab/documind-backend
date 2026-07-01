@@ -10,7 +10,10 @@ import { NestApplicationLogger } from "../shared/infrastructure/nest-application
 import { DOCUMENT_STORAGE, DocumentStorage } from "./application/document-storage";
 import { DocumentFilePolicy } from "./application/document-file-policy";
 import { ORPHAN_DOCUMENT_STORAGE, OrphanDocumentStorage } from "./application/orphan-document-storage";
-import { DOCUMENT_SECURITY_SCANNER } from "./application/document-security-scanner";
+import {
+  DOCUMENT_SECURITY_SCANNER,
+  DocumentSecurityScanner
+} from "./application/document-security-scanner";
 import {
   PROJECT_DOCUMENT_SUMMARY_UPDATER,
   ProjectDocumentSummaryUpdater
@@ -61,6 +64,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         orphanStorage: OrphanDocumentStorage,
         accessChecker: ProjectAccessChecker,
         summaryUpdater: ProjectDocumentSummaryUpdater,
+        securityScanner: DocumentSecurityScanner,
         filePolicy: DocumentFilePolicy,
         clock: Clock,
         idGenerator: IdGenerator,
@@ -72,6 +76,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
           orphanStorage,
           accessChecker,
           summaryUpdater,
+          securityScanner,
           filePolicy,
           clock,
           idGenerator,
@@ -83,6 +88,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         ORPHAN_DOCUMENT_STORAGE,
         PROJECT_ACCESS_CHECKER,
         PROJECT_DOCUMENT_SUMMARY_UPDATER,
+        DOCUMENT_SECURITY_SCANNER,
         DocumentFilePolicy,
         CLOCK,
         ID_GENERATOR,

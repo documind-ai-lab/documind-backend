@@ -132,7 +132,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 6: 커밋**
+- [x] **Step 6: 커밋**
 
 ```bash
 git add src/document-workspace/application/document-security-scanner.ts src/document-workspace/infrastructure/noop-document-security-scanner.ts src/document-workspace/domain/document.errors.ts src/document-workspace/document-workspace.module.ts
@@ -146,7 +146,7 @@ git commit -m "feat: Document 보안 검사 port 추가"
 - Modify: `src/document-workspace/document-workspace.module.ts`
 - Modify: `test/document-use-cases.spec.ts`
 
-- [ ] **Step 1: infected 흐름 실패 테스트 작성**
+- [x] **Step 1: infected 흐름 실패 테스트 작성**
 
 `test/document-use-cases.spec.ts`에 fake scanner를 추가하고 infected 결과를 반환하게 한다.
 
@@ -157,7 +157,7 @@ git commit -m "feat: Document 보안 검사 port 추가"
 - repository에는 FAILED 문서가 저장됨
 - Project summary update는 Document 생성 후 기존 정책대로 호출됨
 
-- [ ] **Step 2: unavailable 흐름 실패 테스트 작성**
+- [x] **Step 2: unavailable 흐름 실패 테스트 작성**
 
 scanner가 `DocumentSecurityScanUnavailableError`를 던지는 테스트를 추가한다.
 
@@ -167,7 +167,7 @@ scanner가 `DocumentSecurityScanUnavailableError`를 던지는 테스트를 추�
 - storage에 파일이 저장되지 않음
 - Project summary update가 호출되지 않음
 
-- [ ] **Step 3: 실패 테스트 실행**
+- [x] **Step 3: 실패 테스트 실행**
 
 Run:
 
@@ -177,13 +177,13 @@ npm test -- test/document-use-cases.spec.ts --runInBand
 
 Expected: 새 테스트 FAIL.
 
-- [ ] **Step 4: use case 생성자에 scanner 주입**
+- [x] **Step 4: use case 생성자에 scanner 주입**
 
 `UploadDocumentUseCase` 생성자에 `DocumentSecurityScanner`를 추가한다.
 
 `DocumentWorkspaceModule` factory의 inject 목록에도 `DOCUMENT_SECURITY_SCANNER`를 추가한다.
 
-- [ ] **Step 5: 업로드 흐름에 검사 단계 추가**
+- [x] **Step 5: 업로드 흐름에 검사 단계 추가**
 
 검사 순서:
 1. 파일 정책 검증
@@ -195,7 +195,7 @@ Expected: 새 테스트 FAIL.
 7. infected이면 `repository.create` 후 `recordProjectSummary` 호출
 8. unavailable이면 예외 전파
 
-- [ ] **Step 6: use case 테스트 통과 확인**
+- [x] **Step 6: use case 테스트 통과 확인**
 
 Run:
 
