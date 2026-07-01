@@ -348,7 +348,7 @@ npm test
 **Files:**
 - Create: `src/document-workspace/infrastructure/local-document-storage.ts`
 - Modify: `src/shared/infrastructure/env.ts`
-- Create or modify: `test/document-api.integration-spec.ts`
+- Create: `test/local-document-storage.spec.ts`
 
 - [x] **Step 1: base path 초기화**
 
@@ -373,7 +373,9 @@ npm test
 Run:
 
 ```bash
-npm run test:integration
+npm test -- test/local-document-storage.spec.ts
+npm run typecheck
+npm test
 ```
 
 ## Task 7: HTTP interface 구현
