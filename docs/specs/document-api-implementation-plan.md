@@ -387,7 +387,7 @@ npm test
 - Create: `src/document-workspace/document-workspace.module.ts`
 - Modify: `src/app.module.ts`
 
-- [ ] **Step 1: DTO 작성**
+- [x] **Step 1: DTO 작성**
 
 DTO:
 - `ListDocumentsQueryDto`
@@ -399,7 +399,7 @@ DTO:
 
 `OwnerIdHeaderDto`는 `X-Owner-Id` 헤더를 필수 UUID로 검증한다. controller는 검증된 값을 모든 use case 입력의 `ownerId`로 전달한다.
 
-- [ ] **Step 2: multipart upload controller 작성**
+- [x] **Step 2: multipart upload controller 작성**
 
 `POST /projects/:projectId/documents`는 file field 하나를 받는다.
 
@@ -409,7 +409,7 @@ Multer `limits.fileSize`를 `DOCUMENT_MAX_FILE_BYTES`로 설정해 50MB 초과 �
 
 controller는 multipart 처리와 DTO 검증만 담당하고, 파일 검증 세부 정책은 use case에 위임한다.
 
-- [ ] **Step 3: presenter 작성**
+- [x] **Step 3: presenter 작성**
 
 응답에서 제외:
 - `storageProvider`
@@ -418,13 +418,13 @@ controller는 multipart 처리와 DTO 검증만 담당하고, 파일 검증 세�
 - `storedName`
 - `ownerId`
 
-- [ ] **Step 4: module 등록**
+- [x] **Step 4: module 등록**
 
 `DocumentWorkspaceModule`에 use case, repository, storage, access checker provider를 등록한다.
 
 `AppModule`에 DocumentWorkspaceModule을 추가한다.
 
-- [ ] **Step 5: 검증**
+- [x] **Step 5: 검증**
 
 Run:
 
@@ -438,7 +438,7 @@ npm test
 **Files:**
 - Create: `test/document-api.e2e-spec.ts`
 
-- [ ] **Step 1: 성공 흐름 테스트**
+- [x] **Step 1: 성공 흐름 테스트**
 
 검증:
 - 업로드 성공
@@ -464,7 +464,7 @@ e2e 테스트는 빠른 실행을 위해 in-memory repository와 fake storage pr
 - 다른 Project의 Document ID로 retry 요청: 404
 - retry 원본 파일 부재 시 `failureReason` 저장 후 409
 
-- [ ] **Step 3: 응답 shape 테스트**
+- [x] **Step 3: 응답 shape 테스트**
 
 `storageProvider`, `storageKey`, `storagePath`, `storedName`, `ownerId`가 응답에 없는지 확인한다.
 
