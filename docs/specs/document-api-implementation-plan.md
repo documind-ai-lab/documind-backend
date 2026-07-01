@@ -68,7 +68,7 @@ test/document-api.integration-spec.ts
 - Modify: `src/shared/infrastructure/env.ts`
 - Modify: `.env.example`
 
-- [ ] **Step 1: DocumentStatus enum 추가**
+- [x] **Step 1: DocumentStatus enum 추가**
 
 `DocumentStatus`는 다음 값을 가진다.
 
@@ -79,7 +79,7 @@ READY
 FAILED
 ```
 
-- [ ] **Step 2: Document model 추가**
+- [x] **Step 2: Document model 추가**
 
 `Document` model은 `docs/specs/document-api-design.md`의 데이터 모델 필드를 따른다.
 
@@ -92,7 +92,7 @@ FAILED
 - `createdAt`, `updatedAt`은 `Timestamptz(6)`
 - `(projectId, createdAt, id)` 복합 인덱스 추가
 
-- [ ] **Step 3: env 확장**
+- [x] **Step 3: env 확장**
 
 환경 변수:
 - `DOCUMENT_STORAGE_BASE_PATH`
@@ -104,7 +104,7 @@ FAILED
 
 상대 경로는 애플리케이션 시작 시 프로젝트 루트 기준 절대 경로로 변환한다.
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 Run:
 
@@ -121,7 +121,7 @@ npm run typecheck
 - Create: `src/document-workspace/domain/document.ts`
 - Create: `test/document-domain.spec.ts`
 
-- [ ] **Step 1: 테스트 작성**
+- [x] **Step 1: 테스트 작성**
 
 검증 항목:
 - Document 생성 시 원본 파일명, MIME type, extension, sizeBytes, storageProvider, storageKey 저장
@@ -129,7 +129,7 @@ npm run typecheck
 - `retry`는 `FAILED`에서만 `TEXT_EXTRACTION_PENDING`으로 전환
 - 재시도 불가능 상태는 409 domain error
 
-- [ ] **Step 2: domain error 작성**
+- [x] **Step 2: domain error 작성**
 
 에러 예시:
 - `DocumentNotFoundError`
@@ -137,13 +137,13 @@ npm run typecheck
 - `DocumentFileValidationError`
 - `DocumentStorageError`
 
-- [ ] **Step 3: Document aggregate 작성**
+- [x] **Step 3: Document aggregate 작성**
 
 `Document.create`, `Document.rehydrate`, `Document.markRetryPending`, `Document.markFailed`, `snapshot`을 제공한다.
 
 도메인 모델은 파일 시스템을 직접 다루지 않는다.
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 Run:
 
@@ -157,7 +157,7 @@ npm test -- test/document-domain.spec.ts
 - Create: `src/document-workspace/application/document-file-policy.ts`
 - Modify: `test/document-use-cases.spec.ts`
 
-- [ ] **Step 1: 파일 입력 타입 정의**
+- [x] **Step 1: 파일 입력 타입 정의**
 
 유스케이스 입력은 HTTP multipart 구현체에 직접 의존하지 않는다.
 
@@ -169,7 +169,7 @@ npm test -- test/document-domain.spec.ts
 
 1차 구현은 메모리 기반 multipart buffer를 사용한다. 50MB 제한이 있으므로 NestJS interceptor에서 파일 크기를 제한한다.
 
-- [ ] **Step 2: 확장자 정책 구현**
+- [x] **Step 2: 확장자 정책 구현**
 
 규칙:
 - 마지막 마침표 뒤 문자열만 확장자로 사용
@@ -178,19 +178,19 @@ npm test -- test/document-domain.spec.ts
 - 허용 확장자: `pdf`, `docx`, `xlsx`, `pptx`, `txt`, `csv`
 - 확장자 없음은 415
 
-- [ ] **Step 3: MIME type 정책 구현**
+- [x] **Step 3: MIME type 정책 구현**
 
 확장자별 allowlist를 구현한다.
 
 `csv`, `txt`는 `application/octet-stream`을 예외 허용한다.
 
-- [ ] **Step 4: 텍스트성 최소 검사 구현**
+- [x] **Step 4: 텍스트성 최소 검사 구현**
 
 `csv`, `txt`가 `application/octet-stream`이면 파일 앞부분의 null byte 포함 여부를 검사한다.
 
 null byte가 있으면 415로 처리한다.
 
-- [ ] **Step 5: 검증**
+- [x] **Step 5: 검증**
 
 Run:
 
@@ -209,7 +209,7 @@ npm test -- test/document-use-cases.spec.ts
 - Create: `src/document-workspace/testing/fake-document-storage.ts`
 - Create: `test/document-use-cases.spec.ts`
 
-- [ ] **Step 1: DocumentRepository port 작성**
+- [x] **Step 1: DocumentRepository port 작성**
 
 필수 메서드:
 - `create(document)`
@@ -219,7 +219,7 @@ npm test -- test/document-use-cases.spec.ts
 
 `DocumentRepository`는 Document 테이블만 다룬다. Project `documentCount`, `lastActivityAt` 갱신 책임을 가지지 않는다.
 
-- [ ] **Step 2: DocumentStorage port 작성**
+- [x] **Step 2: DocumentStorage port 작성**
 
 필수 메서드:
 - `put(storageKey, content)`
@@ -228,7 +228,7 @@ npm test -- test/document-use-cases.spec.ts
 
 storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하지 않는다.
 
-- [ ] **Step 3: OrphanDocumentStorage port 작성**
+- [x] **Step 3: OrphanDocumentStorage port 작성**
 
 필수 메서드:
 - `record(storageKey, reason)`
@@ -238,7 +238,7 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 
 이번 구현은 port와 fake 구현, use case 호출 테스트까지만 포함한다. 백그라운드 스케줄러와 실제 정리 명령은 후속 이슈로 분리한다.
 
-- [ ] **Step 4: ProjectAccessChecker port 작성**
+- [x] **Step 4: ProjectAccessChecker port 작성**
 
 필수 메서드:
 - `ensureWritableProject(projectId, ownerId)`
@@ -246,7 +246,7 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 
 반환값에는 Project ownerId와 Project status 확인 결과를 포함한다.
 
-- [ ] **Step 5: ProjectDocumentSummaryUpdater port 작성**
+- [x] **Step 5: ProjectDocumentSummaryUpdater port 작성**
 
 필수 메서드:
 - `recordDocumentCreated(projectId, ownerId, occurredAt)`
@@ -255,7 +255,7 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 
 Project summary는 조회 편의를 위한 denormalized summary다. Document 생성 성공 후 summary 갱신을 요청하되, 실패하면 로그와 후속 reconciliation 대상으로 기록하고 Document 생성 자체를 롤백하지 않는다.
 
-- [ ] **Step 6: UploadDocumentUseCase 작성**
+- [x] **Step 6: UploadDocumentUseCase 작성**
 
 순서:
 1. 입력 ownerId 검증 결과 사용
@@ -268,7 +268,7 @@ Project summary는 조회 편의를 위한 denormalized summary다. Document 생
 8. 삭제 실패 시 OrphanDocumentStorage에 정리 대상 기록
 9. Document 생성 성공 후 ProjectDocumentSummaryUpdater 호출
 
-- [ ] **Step 7: List/Get/Retry use case 작성**
+- [x] **Step 7: List/Get/Retry use case 작성**
 
 목록과 상세는 Project 읽기 권한을 확인한다.
 
@@ -280,7 +280,7 @@ Project summary는 조회 편의를 위한 denormalized summary다. Document 생
 
 이 경로에서는 예외 기반 rollback에 `failureReason` 저장이 휘말리지 않도록 테스트로 고정한다.
 
-- [ ] **Step 8: 검증**
+- [x] **Step 8: 검증**
 
 Run:
 
