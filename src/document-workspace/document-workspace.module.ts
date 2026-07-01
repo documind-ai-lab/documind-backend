@@ -1,7 +1,12 @@
 import { Module } from "@nestjs/common";
+import {
+  APPLICATION_LOGGER,
+  ApplicationLogger
+} from "../shared/application/application-logger";
 import { CLOCK, Clock, SystemClock } from "../shared/application/clock";
 import { ID_GENERATOR, IdGenerator, UuidV7Generator } from "../shared/application/id-generator";
 import { loadEnv } from "../shared/infrastructure/env";
+import { NestApplicationLogger } from "../shared/infrastructure/nest-application-logger";
 import { DOCUMENT_STORAGE, DocumentStorage } from "./application/document-storage";
 import { DocumentFilePolicy } from "./application/document-file-policy";
 import { ORPHAN_DOCUMENT_STORAGE, OrphanDocumentStorage } from "./application/orphan-document-storage";
@@ -29,6 +34,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
   providers: [
     { provide: CLOCK, useClass: SystemClock },
     { provide: ID_GENERATOR, useClass: UuidV7Generator },
+    { provide: APPLICATION_LOGGER, useClass: NestApplicationLogger },
     { provide: DOCUMENT_REPOSITORY, useClass: PrismaDocumentRepository },
     {
       provide: DOCUMENT_STORAGE,
@@ -54,7 +60,8 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         summaryUpdater: ProjectDocumentSummaryUpdater,
         filePolicy: DocumentFilePolicy,
         clock: Clock,
-        idGenerator: IdGenerator
+        idGenerator: IdGenerator,
+        logger: ApplicationLogger
       ) =>
         new UploadDocumentUseCase(
           repository,
@@ -64,7 +71,8 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
           summaryUpdater,
           filePolicy,
           clock,
-          idGenerator
+          idGenerator,
+          logger
         ),
       inject: [
         DOCUMENT_REPOSITORY,
@@ -74,7 +82,8 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         PROJECT_DOCUMENT_SUMMARY_UPDATER,
         DocumentFilePolicy,
         CLOCK,
-        ID_GENERATOR
+        ID_GENERATOR,
+        APPLICATION_LOGGER
       ]
     },
     {

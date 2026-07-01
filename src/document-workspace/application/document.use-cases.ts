@@ -1,5 +1,6 @@
 import { Clock } from "../../shared/application/clock";
 import { IdGenerator } from "../../shared/application/id-generator";
+import { ApplicationLogger } from "../../shared/application/application-logger";
 import { PageResponse } from "../../shared/application/page-response";
 import { Document, DocumentSnapshot } from "../domain/document";
 import { DocumentNotFoundError } from "../domain/document.errors";
@@ -44,7 +45,8 @@ export class UploadDocumentUseCase {
     private readonly summaryUpdater: ProjectDocumentSummaryUpdater,
     private readonly filePolicy: DocumentFilePolicy,
     private readonly clock: Clock,
-    private readonly idGenerator: IdGenerator
+    private readonly idGenerator: IdGenerator,
+    private readonly logger: ApplicationLogger
   ) {}
 
   async execute(command: UploadDocumentCommand): Promise<DocumentSnapshot> {
@@ -91,7 +93,12 @@ export class UploadDocumentUseCase {
   private async recordProjectSummary(projectId: string, ownerId: string, occurredAt: Date): Promise<void> {
     try {
       await this.summaryUpdater.recordDocumentCreated(projectId, ownerId, occurredAt);
-    } catch {
+    } catch (error) {
+      this.logger.warn("Project 요약 갱신 실패", {
+        projectId,
+        ownerId,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
       // Project summary is denormalized; Document creation remains the source of truth.
     }
   }

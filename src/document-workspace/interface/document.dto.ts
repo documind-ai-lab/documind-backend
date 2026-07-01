@@ -3,16 +3,6 @@ import { Type, plainToInstance } from "class-transformer";
 import { IsInt, IsUUID, Max, Min, validateSync } from "class-validator";
 import { UnprocessableEntityException } from "@nestjs/common";
 
-export class ProjectIdParamDto {
-  @IsUUID()
-  projectId!: string;
-}
-
-export class DocumentIdParamDto extends ProjectIdParamDto {
-  @IsUUID()
-  documentId!: string;
-}
-
 export class ListDocumentsQueryDto {
   @Type(() => Number)
   @IsInt()

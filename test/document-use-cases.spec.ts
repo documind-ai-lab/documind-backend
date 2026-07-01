@@ -117,6 +117,7 @@ describe("Document use cases", () => {
   let orphanStorage: FakeOrphanDocumentStorage;
   let accessChecker: FakeProjectAccessChecker;
   let summaryUpdater: FakeProjectDocumentSummaryUpdater;
+  let logger: FakeApplicationLogger;
   let idGenerator: FixedIdGenerator;
   let uploadUseCase: UploadDocumentUseCase;
 
@@ -126,6 +127,7 @@ describe("Document use cases", () => {
     orphanStorage = new FakeOrphanDocumentStorage();
     accessChecker = new FakeProjectAccessChecker();
     summaryUpdater = new FakeProjectDocumentSummaryUpdater();
+    logger = new FakeApplicationLogger();
     idGenerator = new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000101"]);
     uploadUseCase = new UploadDocumentUseCase(
       repository,
@@ -135,7 +137,8 @@ describe("Document use cases", () => {
       summaryUpdater,
       new DocumentFilePolicy({ maxFileBytes: 50 * 1024 * 1024 }),
       new FixedClock(now),
-      idGenerator
+      idGenerator,
+      logger
     );
   });
 
@@ -201,6 +204,16 @@ describe("Document use cases", () => {
 
     await expect(repository.findByProjectAndId(projectId, document.id)).resolves.not.toBeNull();
     expect(document.status).toBe(DocumentStatus.TEXT_EXTRACTION_PENDING);
+    expect(logger.warns).toEqual([
+      {
+        message: "Project 요약 갱신 실패",
+        metadata: {
+          projectId,
+          ownerId,
+          errorMessage: "summary update failed"
+        }
+      }
+    ]);
   });
 
   it("목록과 상세 조회는 Project 읽기 권한을 확인하고 해당 Project 문서만 반환한다", async () => {
@@ -341,5 +354,13 @@ class FakeOrphanDocumentStorage {
     if (index >= 0) {
       this.records.splice(index, 1);
     }
+  }
+}
+
+class FakeApplicationLogger {
+  readonly warns: Array<{ message: string; metadata?: Record<string, unknown> }> = [];
+
+  warn(message: string, metadata?: Record<string, unknown>): void {
+    this.warns.push({ message, metadata });
   }
 }
