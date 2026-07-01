@@ -350,25 +350,25 @@ npm test
 - Modify: `src/shared/infrastructure/env.ts`
 - Create or modify: `test/document-api.integration-spec.ts`
 
-- [ ] **Step 1: base path 초기화**
+- [x] **Step 1: base path 초기화**
 
 `DOCUMENT_STORAGE_BASE_PATH`를 절대 경로로 해석한다.
 
 디렉터리가 없으면 생성한다.
 
-- [ ] **Step 2: canonical path 검증**
+- [x] **Step 2: canonical path 검증**
 
 `storageKey`와 base path를 조합한 뒤 canonical path가 base path 하위인지 확인한다.
 
 탈출 시 400 오류로 처리한다.
 
-- [ ] **Step 3: put/remove/exists 구현**
+- [x] **Step 3: put/remove/exists 구현**
 
 파일 저장은 필요한 상위 디렉터리를 만든 뒤 수행한다.
 
 삭제 실패는 호출자에게 전달해 use case가 로그와 후속 정리 대상으로 판단할 수 있게 한다.
 
-- [ ] **Step 4: 검증**
+- [x] **Step 4: 검증**
 
 Run:
 

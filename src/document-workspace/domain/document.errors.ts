@@ -18,6 +18,12 @@ export class DocumentStorageError extends DomainError {
   }
 }
 
+export class DocumentStoragePathError extends DomainError {
+  constructor(message: string) {
+    super("VALIDATION_ERROR", message, 400);
+  }
+}
+
 export class DocumentFileValidationError extends DomainError {
   constructor(
     message: string,

@@ -1,3 +1,5 @@
+import { resolve } from "path";
+
 export type AppEnv = {
   databaseUrl: string;
   demoOwnerId: string;
@@ -10,7 +12,7 @@ export type AppEnv = {
 export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
   const databaseUrl = requireEnv(env, "DATABASE_URL");
   const demoOwnerId = requireEnv(env, "DOCUMIND_DEMO_OWNER_ID");
-  const documentStorageBasePath = requireEnv(env, "DOCUMENT_STORAGE_BASE_PATH");
+  const documentStorageBasePath = resolve(requireEnv(env, "DOCUMENT_STORAGE_BASE_PATH"));
   const documentMaxFileBytes = Number(requireEnv(env, "DOCUMENT_MAX_FILE_BYTES"));
   const port = Number(env.PORT ?? 3000);
 
