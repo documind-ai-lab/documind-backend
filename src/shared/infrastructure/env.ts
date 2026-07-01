@@ -1,6 +1,8 @@
 export type AppEnv = {
   databaseUrl: string;
   demoOwnerId: string;
+  documentMaxFileBytes: number;
+  documentStorageBasePath: string;
   nodeEnv: string;
   port: number;
 };
@@ -8,6 +10,8 @@ export type AppEnv = {
 export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
   const databaseUrl = requireEnv(env, "DATABASE_URL");
   const demoOwnerId = requireEnv(env, "DOCUMIND_DEMO_OWNER_ID");
+  const documentStorageBasePath = requireEnv(env, "DOCUMENT_STORAGE_BASE_PATH");
+  const documentMaxFileBytes = Number(requireEnv(env, "DOCUMENT_MAX_FILE_BYTES"));
   const port = Number(env.PORT ?? 3000);
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -18,7 +22,18 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
     throw new Error("DOCUMIND_DEMO_OWNER_ID는 UUID 형식이어야 합니다.");
   }
 
-  return { databaseUrl, demoOwnerId, nodeEnv: env.NODE_ENV ?? "development", port };
+  if (!Number.isInteger(documentMaxFileBytes) || documentMaxFileBytes < 1) {
+    throw new Error("DOCUMENT_MAX_FILE_BYTES는 1 이상의 정수여야 합니다.");
+  }
+
+  return {
+    databaseUrl,
+    demoOwnerId,
+    documentMaxFileBytes,
+    documentStorageBasePath,
+    nodeEnv: env.NODE_ENV ?? "development",
+    port
+  };
 }
 
 function requireEnv(env: NodeJS.ProcessEnv, key: string): string {

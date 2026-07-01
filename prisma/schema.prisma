@@ -25,6 +25,15 @@ enum ProjectStatus {
   @@schema("documind_backend")
 }
 
+enum DocumentStatus {
+  TEXT_EXTRACTION_PENDING
+  TEXT_EXTRACTING
+  READY
+  FAILED
+
+  @@schema("documind_backend")
+}
+
 model Project {
   id                 String        @id @db.Uuid
   ownerId            String        @map("owner_id") @db.Uuid
@@ -37,8 +46,30 @@ model Project {
   createdAt          DateTime      @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime      @map("updated_at") @db.Timestamptz(6)
   lastActivityAt     DateTime      @map("last_activity_at") @db.Timestamptz(6)
+  documents          Document[]
 
   @@index([status, lastActivityAt, id], map: "idx_projects_status_last_activity_id")
   @@map("projects")
+  @@schema("documind_backend")
+}
+
+model Document {
+  id              String         @id @db.Uuid
+  projectId       String         @map("project_id") @db.Uuid
+  ownerId         String         @map("owner_id") @db.Uuid
+  originalName    String         @map("original_name") @db.VarChar(255)
+  storageProvider String         @default("local") @map("storage_provider") @db.VarChar(32)
+  storageKey      String         @map("storage_key") @db.VarChar(1000)
+  mimeType        String         @map("mime_type") @db.VarChar(255)
+  extension       String         @db.VarChar(16)
+  sizeBytes       Int            @map("size_bytes")
+  status          DocumentStatus @default(TEXT_EXTRACTION_PENDING)
+  failureReason   String?        @map("failure_reason") @db.VarChar(1000)
+  createdAt       DateTime       @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @map("updated_at") @db.Timestamptz(6)
+  project         Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
+
+  @@index([projectId, createdAt, id], map: "idx_documents_project_created_id")
+  @@map("documents")
   @@schema("documind_backend")
 }
