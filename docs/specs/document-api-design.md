@@ -44,7 +44,7 @@ src/
 - `interface`: NestJS controller, multipart upload 처리, request DTO, response presenter
 - `testing`: 인메모리 repository와 storage fake
 
-도메인 모델은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. 유스케이스는 repository port, storage port, project access port, clock, id generator, owner provider에 의존한다.
+도메인 모델은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. 유스케이스는 repository port, storage port, project access port, clock, id generator와 입력으로 전달된 ownerId에 의존한다.
 
 ## 모듈 경계
 
@@ -111,6 +111,14 @@ POST /projects/:projectId/documents/:documentId/retry
 
 `DELETE /projects/:projectId/documents/:documentId`는 만들지 않는다.
 
+1차 MVP에는 User/Auth 컨텍스트가 없으므로 모든 API는 `X-Owner-Id` 요청 헤더를 필수로 받는다.
+
+- 헤더 이름: `X-Owner-Id`
+- 값 형식: UUID
+- 누락 또는 UUID 형식 오류: 422 검증 오류
+- controller는 헤더를 검증해 use case 입력의 `ownerId`로 전달한다.
+- `ownerId`는 응답에 노출하지 않는다.
+
 ### 업로드
 
 `POST /projects/:projectId/documents`는 multipart file을 받는다.
@@ -148,13 +156,22 @@ POST /projects/:projectId/documents/:documentId/retry
 
 `GET /projects/:projectId/documents/:documentId`는 문서 기본 정보와 처리 상태를 반환한다.
 
-현재 ownerId가 Project에 접근할 수 없거나 문서가 해당 Project에 속하지 않으면 404로 처리한다. 1차 MVP의 owner provider 기준에서는 Project ownerId 불일치와 다른 Project의 Document 접근을 404로 숨기는 방식을 사용한다.
+현재 ownerId가 Project에 접근할 수 없거나 문서가 해당 Project에 속하지 않으면 404로 처리한다. 1차 MVP의 `X-Owner-Id` 헤더 기준에서는 Project ownerId 불일치와 다른 Project의 Document 접근을 404로 숨기는 방식을 사용한다.
 
 ### 재시도
 
 `POST /projects/:projectId/documents/:documentId/retry`는 `FAILED` 상태에서만 허용한다.
 
-재시도 전에는 DB 트랜잭션을 열기 전에 원본 파일이 저장소에 존재하고 읽을 수 있는지 확인한다. 파일이 없거나 읽을 수 없으면 상태를 되돌리지 않고 409 오류를 반환하며, `failureReason`을 갱신한다.
+재시도 전에는 DB 트랜잭션을 열기 전에 원본 파일이 저장소에 존재하고 읽을 수 있는지 확인한다. 파일이 없거나 읽을 수 없으면 상태를 되돌리지 않고 `failureReason`을 갱신한 뒤 409 오류를 반환한다.
+
+원본 파일 부재나 읽기 실패는 다음 순서로 처리한다.
+
+1. Project 읽기 권한을 확인한다.
+2. Document가 해당 Project에 속하는지 확인한다.
+3. Document가 `FAILED` 상태인지 확인한다.
+4. storage `exists` 결과가 실패이면 Document를 `FAILED`로 유지하고 `failureReason`을 갱신한다.
+5. repository `save`가 성공한 뒤 use case가 `DocumentStateConflictError`를 반환한다.
+6. HTTP interface는 해당 domain error를 409 응답으로 매핑한다.
 
 성공하면 상태를 `TEXT_EXTRACTION_PENDING`으로 되돌린다. 실제 worker 재큐잉은 후속 범위다.
 

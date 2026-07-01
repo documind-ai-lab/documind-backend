@@ -5,7 +5,7 @@
 
 **Goal:** NestJS와 Prisma 기반으로 프로젝트별 문서 업로드, 목록 조회, 상세 조회, 재시도 API를 구현한다.
 
-**Architecture:** 모듈러 모놀리스 안에 `document-workspace` 모듈을 추가한다. Document 도메인은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. Controller는 HTTP multipart와 DTO 검증을 담당하고, Use Case는 repository port, storage port, project access port, clock, id generator, owner provider에만 의존한다.
+**Architecture:** 모듈러 모놀리스 안에 `document-workspace` 모듈을 추가한다. Document 도메인은 NestJS, Prisma, 파일 시스템에 의존하지 않는다. Controller는 HTTP multipart와 DTO 검증을 담당하고, Use Case는 repository port, storage port, project access port, clock, id generator에만 의존한다. 1차 MVP의 `ownerId`는 인증 컨텍스트가 아니라 `X-Owner-Id` 헤더 DTO에서 검증해 use case 입력으로 전달한다.
 
 **Tech Stack:** Node.js 20.19 이상, TypeScript 6, NestJS 11, Prisma 6.19, PostgreSQL, Jest 29, Supertest
 
@@ -41,6 +41,7 @@ src/document-workspace/domain/document.errors.ts
 src/document-workspace/domain/document.ts
 src/document-workspace/application/document.repository.ts
 src/document-workspace/application/document-storage.ts
+src/document-workspace/application/orphan-document-storage.ts
 src/document-workspace/application/project-access-checker.ts
 src/document-workspace/application/document-file-policy.ts
 src/document-workspace/application/document.use-cases.ts
@@ -225,7 +226,17 @@ npm test -- test/document-use-cases.spec.ts
 
 storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하지 않는다.
 
-- [ ] **Step 3: ProjectAccessChecker port 작성**
+- [ ] **Step 3: OrphanDocumentStorage port 작성**
+
+필수 메서드:
+- `record(storageKey, reason)`
+- `resolve(storageKey)`
+
+파일 저장 성공 후 DB 저장 또는 Project 요약 갱신이 실패했는데 storage remove도 실패하면 `record`를 호출한다.
+
+이번 구현은 port와 fake 구현, use case 호출 테스트까지만 포함한다. 백그라운드 스케줄러와 실제 정리 명령은 후속 이슈로 분리한다.
+
+- [ ] **Step 4: ProjectAccessChecker port 작성**
 
 필수 메서드:
 - `ensureWritableProject(projectId, ownerId)`
@@ -233,24 +244,27 @@ storage port는 `DOCUMENT_STORAGE_BASE_PATH` 같은 환경 설정을 노출하�
 
 반환값에는 Project ownerId와 Project status 확인 결과를 포함한다.
 
-- [ ] **Step 4: UploadDocumentUseCase 작성**
+- [ ] **Step 5: UploadDocumentUseCase 작성**
 
 순서:
-1. ownerId 조회
+1. 입력 ownerId 검증 결과 사용
 2. Project 접근 및 ACTIVE 상태 확인
 3. 파일 검증
 4. documentId, storageKey 생성
 5. DB 트랜잭션 전 storage에 파일 저장
 6. Document 생성과 Project 요약값 갱신
 7. 실패 시 저장 파일 삭제 시도
+8. 삭제 실패 시 OrphanDocumentStorage에 정리 대상 기록
 
-- [ ] **Step 5: List/Get/Retry use case 작성**
+- [ ] **Step 6: List/Get/Retry use case 작성**
 
 목록과 상세는 Project 읽기 권한을 확인한다.
 
 재시도는 `FAILED` 상태와 원본 파일 존재 여부를 확인한다.
 
-- [ ] **Step 6: 검증**
+원본 파일이 없거나 읽을 수 없으면 Document 상태는 `FAILED`로 유지하고 `failureReason`을 먼저 저장한다. 저장이 성공한 뒤 use case는 `DocumentStateConflictError`를 반환하고, HTTP interface에서 409로 매핑한다. 예외를 먼저 throw해서 `failureReason` 저장이 건너뛰지 않도록 테스트로 고정한다.
+
+- [ ] **Step 7: 검증**
 
 Run:
 
@@ -351,8 +365,11 @@ DTO:
 - `ListDocumentsQueryDto`
 - `ProjectIdParamDto`
 - `DocumentIdParamDto`
+- `OwnerIdHeaderDto`
 
 `page`, `size` 규칙은 Project API와 동일하다.
+
+`OwnerIdHeaderDto`는 `X-Owner-Id` 헤더를 필수 UUID로 검증한다. controller는 검증된 값을 모든 use case 입력의 `ownerId`로 전달한다.
 
 - [ ] **Step 2: multipart upload controller 작성**
 
@@ -412,6 +429,9 @@ e2e 테스트는 빠른 실행을 위해 in-memory repository와 fake storage pr
 - Project 없음: 404
 - 보관된 Project 업로드: 409
 - 재시도 불가능 상태: 409
+- `X-Owner-Id` 누락 또는 UUID 형식 오류: 422
+- 다른 Project의 Document ID로 상세 조회: 404
+- retry 원본 파일 부재 시 `failureReason` 저장 후 409
 
 - [ ] **Step 3: 응답 shape 테스트**
 
@@ -448,6 +468,7 @@ npm run prisma:migrate:dev
 - Project `documentCount` 증가
 - Project `lastActivityAt` 갱신
 - 원본 파일 저장 확인
+- retry 원본 파일 부재 시 DB의 `failureReason` 갱신 확인
 
 - [ ] **Step 3: 테스트 데이터 정리**
 
