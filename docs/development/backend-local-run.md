@@ -29,6 +29,10 @@ DATABASE_URL="$MIGRATION_DATABASE_URL" npm run prisma:migrate:dev -- --name crea
 
 Document API를 사용하려면 `DOCUMENT_STORAGE_BASE_PATH`가 필요하다. 개발 환경에서는 상대 경로 예시를 사용할 수 있지만, 애플리케이션은 시작 시 현재 실행 위치 기준 절대 경로로 변환한다. 운영 또는 공유 서버에서는 `/var/lib/documind/documents`처럼 배포 디렉터리와 분리된 영속 볼륨 경로를 사용한다.
 
+1차 MVP의 업로드 파일 보안 검사는 `DocumentSecurityScanner` port를 통해 실행된다. 로컬 기본 adapter는 `NoopDocumentSecurityScanner`이며 파일 내용을 저장하거나 외부 백신 엔진에 전달하지 않고 항상 clean 결과를 반환한다. 감염 의심 파일을 `FAILED` Document로 기록하고 원본 파일을 저장하지 않는 흐름은 테스트 fake scanner로 검증한다.
+
+실제 ClamAV 또는 clamd adapter 연동은 후속 범위다. 운영 adapter를 붙일 때도 scanner가 unavailable이면 Document와 원본 파일을 만들지 않고 `DOCUMENT_SECURITY_SCAN_UNAVAILABLE` 503 오류를 반환하는 계약은 유지한다.
+
 계정 권한 기준은 다음과 같다.
 
 - `documind_backend_migrator`: schema 생성/변경, table/index/enum 생성 등 DDL 권한

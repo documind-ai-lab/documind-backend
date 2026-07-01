@@ -250,7 +250,7 @@ npm run test:e2e
 
 Expected: PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add test/document-api.e2e-spec.ts
@@ -263,7 +263,7 @@ git commit -m "test: Document 보안 검사 e2e 추가"
 - Modify: `docs/development/backend-local-run.md`
 - Modify: `docs/specs/file-security-scan-implementation-plan.md`
 
-- [ ] **Step 1: 로컬 실행 문서 보완**
+- [x] **Step 1: 로컬 실행 문서 보완**
 
 `docs/development/backend-local-run.md`에 다음 내용을 추가한다.
 
@@ -286,7 +286,7 @@ git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 3: 문서 금지어 검색**
+- [x] **Step 3: 문서 금지어 검색**
 
 Run:
 
@@ -296,7 +296,7 @@ rg -n "TB[D]|TO[D]O|placeholde[r]|fill i[n]|나중[e]|적[절]|미[정]|CHANGE_M
 
 Expected: no matches.
 
-- [ ] **Step 4: 구현 계획 완료 상태 반영**
+- [x] **Step 4: 구현 계획 완료 상태 반영**
 
 완료된 task의 checkbox를 실제 결과에 맞게 갱신한다.
 
