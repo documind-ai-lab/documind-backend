@@ -37,7 +37,7 @@ test/document-api.e2e-spec.ts
 - Modify: `src/document-workspace/domain/document.ts`
 - Modify: `test/document-domain.spec.ts`
 
-- [ ] **Step 1: 실패 생성 테스트 작성**
+- [x] **Step 1: 실패 생성 테스트 작성**
 
 `test/document-domain.spec.ts`에 보안 실패 문서 생성 테스트를 추가한다.
 
@@ -47,7 +47,7 @@ test/document-api.e2e-spec.ts
 - `storageKey`는 추적용으로 유지된다.
 - `createdAt`과 `updatedAt`은 같은 시각으로 저장된다.
 
-- [ ] **Step 2: 실패 테스트 실행**
+- [x] **Step 2: 실패 테스트 실행**
 
 Run:
 
@@ -57,7 +57,7 @@ npm test -- test/document-domain.spec.ts --runInBand
 
 Expected: `Document.createFailed is not a function` 또는 동등한 실패.
 
-- [ ] **Step 3: `Document.createFailed` 구현**
+- [x] **Step 3: `Document.createFailed` 구현**
 
 `src/document-workspace/domain/document.ts`에 `CreateFailedDocumentInput`과 `Document.createFailed`를 추가한다.
 
@@ -66,7 +66,7 @@ Expected: `Document.createFailed is not a function` 또는 동등한 실패.
 - `failureReason: normalizeFailureReason(input.failureReason)`
 - `originalName`, `extension`은 기존 생성 규칙과 동일하게 정규화
 
-- [ ] **Step 4: 도메인 테스트 통과 확인**
+- [x] **Step 4: 도메인 테스트 통과 확인**
 
 Run:
 

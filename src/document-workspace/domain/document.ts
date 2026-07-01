@@ -30,6 +30,10 @@ export type CreateDocumentInput = {
   now: Date;
 };
 
+export type CreateFailedDocumentInput = CreateDocumentInput & {
+  failureReason: string;
+};
+
 export class Document {
   private constructor(private state: DocumentSnapshot) {}
 
@@ -46,6 +50,24 @@ export class Document {
       sizeBytes: input.sizeBytes,
       status: DocumentStatus.TEXT_EXTRACTION_PENDING,
       failureReason: null,
+      createdAt: input.now,
+      updatedAt: input.now
+    });
+  }
+
+  static createFailed(input: CreateFailedDocumentInput): Document {
+    return new Document({
+      id: input.id,
+      projectId: input.projectId,
+      ownerId: input.ownerId,
+      originalName: normalizeOriginalName(input.originalName),
+      storageProvider: input.storageProvider,
+      storageKey: input.storageKey,
+      mimeType: input.mimeType,
+      extension: normalizeExtension(input.extension),
+      sizeBytes: input.sizeBytes,
+      status: DocumentStatus.FAILED,
+      failureReason: normalizeFailureReason(input.failureReason),
       createdAt: input.now,
       updatedAt: input.now
     });
