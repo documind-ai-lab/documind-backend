@@ -482,7 +482,7 @@ npm run test:e2e
 - Create: `test/document-api.integration-spec.ts`
 - Modify: `docs/development/backend-local-run.md`
 
-- [ ] **Step 1: migration 적용 검증**
+- [x] **Step 1: migration 적용 검증**
 
 Run:
 
@@ -501,7 +501,7 @@ npm run prisma:migrate:dev
 - 원본 파일 저장 확인
 - retry 원본 파일 부재 시 DB의 `failureReason` 갱신 확인
 
-- [ ] **Step 2-1: 실제 DB round-trip 실행 검증**
+- [x] **Step 2-1: 실제 DB round-trip 실행 검증**
 
 Run:
 
