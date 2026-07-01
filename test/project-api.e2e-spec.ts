@@ -13,6 +13,8 @@ describe("Project API", () => {
     process.env.DATABASE_URL =
       "postgresql://documind_backend_app:test_password@localhost:5432/documind?schema=documind_backend";
     process.env.DOCUMIND_DEMO_OWNER_ID = "7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e";
+    process.env.DOCUMENT_STORAGE_BASE_PATH = "./.storage/test-documents";
+    process.env.DOCUMENT_MAX_FILE_BYTES = String(50 * 1024 * 1024);
 
     const moduleRef = await Test.createTestingModule({
       imports: [ProjectWorkspaceModule]
@@ -35,7 +37,7 @@ describe("Project API", () => {
   });
 
   afterEach(async () => {
-    await app.close();
+    await app?.close();
   });
 
   it("프로젝트 생성, 목록, 상세, 수정, 보관, 복원 흐름과 오류 응답을 검증한다", async () => {
