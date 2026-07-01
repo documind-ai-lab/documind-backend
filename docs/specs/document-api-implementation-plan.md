@@ -526,7 +526,7 @@ RUN_DB_INTEGRATION=true npm run test:integration
 
 ## Task 10: 최종 검증과 PR 준비
 
-- [ ] **Step 1: 전체 검증**
+- [x] **Step 1: 전체 검증**
 
 Run:
 
@@ -538,7 +538,7 @@ npm run test:e2e
 npm run test:integration
 ```
 
-- [ ] **Step 2: 문서 검증**
+- [x] **Step 2: 문서 검증**
 
 Run:
 
@@ -546,11 +546,13 @@ Run:
 rg -n "TB[D]|TO[D]O|placeholde[r]|fill i[n]|나중[e]|적[절]|미[정]|CHANGE_M[E]" docs src test prisma
 ```
 
-- [ ] **Step 3: PR 생성**
+- [x] **Step 3: PR 생성**
 
 PR 본문은 `.github/pull_request_template.md` 구조를 사용한다.
 
 연결 이슈는 `Refs #<구현 이슈 번호>`로 적고, 병합 후 이슈 close와 Project `Done` 확인을 완료 루프에서 처리한다.
+
+PR: `#39`
 
 - [ ] **Step 4: Antigravity 리뷰**
 
