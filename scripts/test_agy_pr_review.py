@@ -114,10 +114,10 @@ class PostReviewCommentTest(unittest.TestCase):
             "diff --git a/example b/example",
         )
 
-        self.assertIn("MVP 머지 가능 여부", prompt)
-        self.assertIn("머지 차단 기준", prompt)
+        self.assertIn("MVP 병합 가능 여부", prompt)
+        self.assertIn("병합 차단 기준", prompt)
         self.assertIn("후속 이슈 기준", prompt)
-        self.assertIn("추가 머지 차단 항목 없음", prompt)
+        self.assertIn("추가 병합 차단 항목 없음", prompt)
         self.assertIn("diff --git a/example b/example", prompt)
 
 
