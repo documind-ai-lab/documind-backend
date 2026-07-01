@@ -24,6 +24,12 @@ export class DocumentStoragePathError extends DomainError {
   }
 }
 
+export class DocumentSecurityScanUnavailableError extends DomainError {
+  constructor() {
+    super("DOCUMENT_SECURITY_SCAN_UNAVAILABLE", "파일 보안 검사를 완료할 수 없습니다.", 503);
+  }
+}
+
 export class DocumentFileValidationError extends DomainError {
   constructor(
     message: string,

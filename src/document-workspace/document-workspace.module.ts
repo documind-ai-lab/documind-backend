@@ -10,6 +10,7 @@ import { NestApplicationLogger } from "../shared/infrastructure/nest-application
 import { DOCUMENT_STORAGE, DocumentStorage } from "./application/document-storage";
 import { DocumentFilePolicy } from "./application/document-file-policy";
 import { ORPHAN_DOCUMENT_STORAGE, OrphanDocumentStorage } from "./application/orphan-document-storage";
+import { DOCUMENT_SECURITY_SCANNER } from "./application/document-security-scanner";
 import {
   PROJECT_DOCUMENT_SUMMARY_UPDATER,
   ProjectDocumentSummaryUpdater
@@ -24,6 +25,7 @@ import {
 } from "./application/document.use-cases";
 import { DocumentController } from "./interface/document.controller";
 import { LocalDocumentStorage } from "./infrastructure/local-document-storage";
+import { NoopDocumentSecurityScanner } from "./infrastructure/noop-document-security-scanner";
 import { NoopOrphanDocumentStorage } from "./infrastructure/noop-orphan-document-storage";
 import { PrismaDocumentRepository } from "./infrastructure/prisma-document.repository";
 import { PrismaProjectAccessChecker } from "./infrastructure/prisma-project-access-checker";
@@ -40,6 +42,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
       provide: DOCUMENT_STORAGE,
       useFactory: () => new LocalDocumentStorage(loadEnv().documentStorageBasePath)
     },
+    { provide: DOCUMENT_SECURITY_SCANNER, useClass: NoopDocumentSecurityScanner },
     { provide: ORPHAN_DOCUMENT_STORAGE, useClass: NoopOrphanDocumentStorage },
     { provide: PROJECT_ACCESS_CHECKER, useClass: PrismaProjectAccessChecker },
     {

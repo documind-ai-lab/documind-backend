@@ -76,7 +76,7 @@ npm test -- test/document-domain.spec.ts --runInBand
 
 Expected: PASS.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add src/document-workspace/domain/document.ts test/document-domain.spec.ts
@@ -90,7 +90,7 @@ git commit -m "feat: Document 보안 검사 실패 상태 생성 추가"
 - Create: `src/document-workspace/infrastructure/noop-document-security-scanner.ts`
 - Modify: `src/document-workspace/document-workspace.module.ts`
 
-- [ ] **Step 1: port 작성**
+- [x] **Step 1: port 작성**
 
 `DocumentSecurityScanner` port를 추가한다.
 
@@ -100,7 +100,7 @@ git commit -m "feat: Document 보안 검사 실패 상태 생성 추가"
 - `DocumentSecurityScanner`
 - `DOCUMENT_SECURITY_SCANNER`
 
-- [ ] **Step 2: unavailable domain error 추가**
+- [x] **Step 2: unavailable domain error 추가**
 
 `src/document-workspace/domain/document.errors.ts`에 `DocumentSecurityScanUnavailableError`를 추가한다.
 
@@ -109,11 +109,11 @@ git commit -m "feat: Document 보안 검사 실패 상태 생성 추가"
 - status: `503`
 - message: `파일 보안 검사를 완료할 수 없습니다.`
 
-- [ ] **Step 3: no-op adapter 작성**
+- [x] **Step 3: no-op adapter 작성**
 
 `NoopDocumentSecurityScanner`는 입력을 저장하지 않고 항상 `{ status: "clean" }`을 반환한다.
 
-- [ ] **Step 4: Nest module provider 등록**
+- [x] **Step 4: Nest module provider 등록**
 
 `DocumentWorkspaceModule`에 다음 provider를 등록한다.
 
@@ -121,7 +121,7 @@ git commit -m "feat: Document 보안 검사 실패 상태 생성 추가"
 { provide: DOCUMENT_SECURITY_SCANNER, useClass: NoopDocumentSecurityScanner }
 ```
 
-- [ ] **Step 5: 검증**
+- [x] **Step 5: 검증**
 
 Run:
 
