@@ -490,7 +490,7 @@ Run:
 npm run prisma:migrate:dev
 ```
 
-- [ ] **Step 2: 실제 DB round-trip 검증**
+- [x] **Step 2: 실제 DB round-trip 테스트 구현**
 
 검증:
 - Project 생성 후 Document 업로드
@@ -501,13 +501,21 @@ npm run prisma:migrate:dev
 - 원본 파일 저장 확인
 - retry 원본 파일 부재 시 DB의 `failureReason` 갱신 확인
 
-- [ ] **Step 3: 테스트 데이터 정리**
+- [ ] **Step 2-1: 실제 DB round-trip 실행 검증**
+
+Run:
+
+```bash
+RUN_DB_INTEGRATION=true npm run test:integration
+```
+
+- [x] **Step 3: 테스트 데이터 정리**
 
 통합 테스트 ownerId와 storage temp directory를 분리한다.
 
 테스트 후 DB 데이터와 파일을 정리한다.
 
-- [ ] **Step 4: 실행 문서 보완**
+- [x] **Step 4: 실행 문서 보완**
 
 `docs/development/backend-local-run.md`에 다음을 추가한다.
 

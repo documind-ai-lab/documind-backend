@@ -1,5 +1,8 @@
 import { HttpStatus, INestApplication, ValidationPipe } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { mkdtemp, rm } from "fs/promises";
+import { tmpdir } from "os";
+import { join } from "path";
 import request from "supertest";
 import { AppModule } from "../src/app.module";
 import { PrismaService } from "../src/shared/infrastructure/prisma/prisma.service";
@@ -13,10 +16,14 @@ const testNamePrefix = "[integration] Project API";
 describeDbIntegration("Project API PostgreSQL integration", () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let storageBasePath: string;
 
   beforeAll(async () => {
     requireDatabaseUrl();
+    storageBasePath = await mkdtemp(join(tmpdir(), "documind-project-integration-"));
     process.env.DOCUMIND_DEMO_OWNER_ID = integrationOwnerId;
+    process.env.DOCUMENT_STORAGE_BASE_PATH = storageBasePath;
+    process.env.DOCUMENT_MAX_FILE_BYTES = String(50 * 1024 * 1024);
 
     const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
@@ -42,6 +49,9 @@ describeDbIntegration("Project API PostgreSQL integration", () => {
     }
     if (app !== undefined) {
       await app.close();
+    }
+    if (storageBasePath !== undefined) {
+      await rm(storageBasePath, { recursive: true, force: true });
     }
   });
 
@@ -123,6 +133,7 @@ describeDbIntegration("Project API PostgreSQL integration", () => {
   });
 
   async function cleanupIntegrationProjects(): Promise<void> {
+    await prisma.document.deleteMany({ where: { ownerId: integrationOwnerId } });
     await prisma.project.deleteMany({ where: { ownerId: integrationOwnerId } });
   }
 });
