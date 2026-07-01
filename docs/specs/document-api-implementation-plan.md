@@ -296,7 +296,7 @@ npm test -- test/document-use-cases.spec.ts
 - Create: `src/project-workspace/infrastructure/prisma-project-document-summary-updater.ts`
 - Modify: `src/document-workspace/document-workspace.module.ts`
 
-- [ ] **Step 1: PrismaDocumentRepository 작성**
+- [x] **Step 1: PrismaDocumentRepository 작성**
 
 `DocumentRepository`를 구현한다.
 
@@ -306,7 +306,7 @@ Project 테이블을 직접 update하지 않는다.
 
 파일 쓰기, 파일 읽기, MIME 재검사는 repository 내부에서 수행하지 않는다.
 
-- [ ] **Step 2: 목록 조회 구현**
+- [x] **Step 2: 목록 조회 구현**
 
 정렬:
 - `createdAt DESC`
@@ -316,13 +316,13 @@ Project 테이블을 직접 update하지 않는다.
 - offset 기반
 - `page`, `size`
 
-- [ ] **Step 3: PrismaProjectAccessChecker 작성**
+- [x] **Step 3: PrismaProjectAccessChecker 작성**
 
 Project가 없거나 owner가 다르면 not found로 처리한다.
 
 업로드 시 Project가 `ARCHIVED`이면 409로 처리한다.
 
-- [ ] **Step 4: PrismaProjectDocumentSummaryUpdater 작성**
+- [x] **Step 4: PrismaProjectDocumentSummaryUpdater 작성**
 
 `ProjectDocumentSummaryUpdater`를 구현한다.
 
@@ -334,7 +334,7 @@ Project가 없거나 owner가 다르면 not found로 처리한다.
 
 이 adapter는 Project Workspace 소유 테이블을 다루며, Document repository가 Project 테이블을 직접 갱신하지 않게 하는 경계 역할을 한다.
 
-- [ ] **Step 5: 검증**
+- [x] **Step 5: 검증**
 
 Run:
 
