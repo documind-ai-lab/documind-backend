@@ -6,10 +6,15 @@ import {
 
 @Injectable()
 export class NoopOrphanDocumentStorage implements OrphanDocumentStorage {
-  async record(): Promise<void> {}
-  async listDueCleanup(): Promise<OrphanDocumentCleanupRecord[]> {
+  async record(_storageKey: string, _reason: string): Promise<void> {}
+  async listDueCleanup(_limit: number, _now: Date): Promise<OrphanDocumentCleanupRecord[]> {
     return [];
   }
-  async resolve(): Promise<void> {}
-  async markFailed(): Promise<void> {}
+  async resolve(_storageKey: string, _resolvedAt: Date): Promise<void> {}
+  async markFailed(
+    _storageKey: string,
+    _errorMessage: string,
+    _nextRetryAt: Date,
+    _failedAt: Date
+  ): Promise<void> {}
 }

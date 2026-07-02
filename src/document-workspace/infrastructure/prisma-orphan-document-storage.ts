@@ -28,6 +28,7 @@ export class PrismaOrphanDocumentStorage implements OrphanDocumentStorage {
       update: {
         reason,
         status: "PENDING",
+        attemptCount: 0,
         lastError: null,
         nextRetryAt: now,
         cleanedAt: null,
@@ -74,10 +75,14 @@ export class PrismaOrphanDocumentStorage implements OrphanDocumentStorage {
       data: {
         status: "PENDING",
         attemptCount: { increment: 1 },
-        lastError: errorMessage,
+        lastError: truncateLastError(errorMessage),
         nextRetryAt,
         updatedAt: failedAt
       }
     });
   }
+}
+
+function truncateLastError(errorMessage: string): string {
+  return errorMessage.slice(0, 1000);
 }

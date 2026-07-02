@@ -28,6 +28,7 @@ describe("PrismaOrphanDocumentStorage", () => {
       update: expect.objectContaining({
         reason: "DOCUMENT_CREATE_FAILED_CLEANUP_FAILED",
         status: "PENDING",
+        attemptCount: 0,
         lastError: null,
         cleanedAt: null,
         nextRetryAt: expect.any(Date),
@@ -105,6 +106,31 @@ describe("PrismaOrphanDocumentStorage", () => {
         status: "PENDING",
         attemptCount: { increment: 1 },
         lastError: "remove failed",
+        nextRetryAt,
+        updatedAt: now
+      }
+    });
+  });
+
+  it("markFailed는 DB 컬럼 길이를 넘는 실패 사유를 1000자로 제한한다", async () => {
+    const delegate = createDelegate();
+    const storage = new PrismaOrphanDocumentStorage(createPrisma(delegate));
+    const longErrorMessage = "x".repeat(1200);
+    const nextRetryAt = new Date("2026-07-02T01:10:00.000Z");
+
+    await storage.markFailed(
+      "projects/p1/documents/d1/d1.pdf",
+      longErrorMessage,
+      nextRetryAt,
+      now
+    );
+
+    expect(delegate.update).toHaveBeenCalledWith({
+      where: { storageKey: "projects/p1/documents/d1/d1.pdf" },
+      data: {
+        status: "PENDING",
+        attemptCount: { increment: 1 },
+        lastError: "x".repeat(1000),
         nextRetryAt,
         updatedAt: now
       }
