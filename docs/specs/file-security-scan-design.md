@@ -80,6 +80,7 @@ ClamAV 공식 문서 기준으로 `clamd`는 libclamav를 사용하는 멀티스
 export const DOCUMENT_SECURITY_SCANNER = Symbol("DOCUMENT_SECURITY_SCANNER");
 
 export type DocumentSecurityScanInput = {
+  documentId: string;
   originalName: string;
   mimeType: string;
   extension: string;
