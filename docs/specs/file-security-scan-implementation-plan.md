@@ -271,7 +271,7 @@ git commit -m "test: Document 보안 검사 e2e 추가"
 - 실제 ClamAV adapter는 후속 범위임
 - infected 흐름은 테스트 fake scanner로 검증함
 
-- [ ] **Step 2: 전체 검증 실행**
+- [x] **Step 2: 검증 실행 및 미완료 사유 기록**
 
 Run:
 
@@ -284,7 +284,7 @@ RUN_DB_INTEGRATION=true npm run test:integration
 git diff --check
 ```
 
-Expected: PASS.
+Expected: DB 접근이 가능한 환경에서는 PASS.
 
 실행 결과:
 - `npm run lint`: PASS
