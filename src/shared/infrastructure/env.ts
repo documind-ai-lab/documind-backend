@@ -1,5 +1,14 @@
 import { resolve } from "path";
 
+export type DocumentStorageProvider = "local" | "s3";
+
+export type DocumentStorageS3Env = {
+  bucket: string;
+  region: string;
+  endpoint: string | null;
+  forcePathStyle: boolean;
+};
+
 export type AppEnv = {
   databaseUrl: string;
   demoOwnerId: string;
@@ -8,7 +17,9 @@ export type AppEnv = {
   orphanDocumentCleanupEnabled: boolean;
   orphanDocumentCleanupIntervalMs: number;
   orphanDocumentCleanupRetryDelayMs: number;
-  documentStorageBasePath: string;
+  documentStorageBasePath: string | null;
+  documentStorageProvider: DocumentStorageProvider;
+  documentStorageS3: DocumentStorageS3Env | null;
   nodeEnv: string;
   port: number;
 };
@@ -16,7 +27,15 @@ export type AppEnv = {
 export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
   const databaseUrl = requireEnv(env, "DATABASE_URL");
   const demoOwnerId = requireEnv(env, "DOCUMIND_DEMO_OWNER_ID");
-  const documentStorageBasePath = resolve(requireEnv(env, "DOCUMENT_STORAGE_BASE_PATH"));
+  const documentStorageProvider = parseDocumentStorageProvider(
+    env.DOCUMENT_STORAGE_PROVIDER ?? "local"
+  );
+  const documentStorageBasePath =
+    documentStorageProvider === "local"
+      ? resolve(requireEnv(env, "DOCUMENT_STORAGE_BASE_PATH"))
+      : null;
+  const documentStorageS3 =
+    documentStorageProvider === "s3" ? parseDocumentStorageS3(env) : null;
   const documentMaxFileBytes = Number(requireEnv(env, "DOCUMENT_MAX_FILE_BYTES"));
   const orphanDocumentCleanupEnabled = parseBoolean(
     env.ORPHAN_DOCUMENT_CLEANUP_ENABLED ?? "false",
@@ -57,6 +76,8 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
     orphanDocumentCleanupIntervalMs,
     orphanDocumentCleanupRetryDelayMs,
     documentStorageBasePath,
+    documentStorageProvider,
+    documentStorageS3,
     nodeEnv: env.NODE_ENV ?? "development",
     port
   };
@@ -82,6 +103,28 @@ function parseBoolean(value: string, key: string): boolean {
   }
 
   throw new Error(`${key}는 true 또는 false여야 합니다.`);
+}
+
+function parseDocumentStorageProvider(value: string): DocumentStorageProvider {
+  if (value === "local" || value === "s3") {
+    return value;
+  }
+
+  throw new Error("DOCUMENT_STORAGE_PROVIDER는 local 또는 s3여야 합니다.");
+}
+
+function parseDocumentStorageS3(env: NodeJS.ProcessEnv): DocumentStorageS3Env {
+  const endpoint = env.DOCUMENT_STORAGE_S3_ENDPOINT?.trim() ?? "";
+
+  return {
+    bucket: requireEnv(env, "DOCUMENT_STORAGE_S3_BUCKET"),
+    region: requireEnv(env, "DOCUMENT_STORAGE_S3_REGION"),
+    endpoint: endpoint === "" ? null : endpoint,
+    forcePathStyle: parseBoolean(
+      env.DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE ?? "false",
+      "DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE"
+    )
+  };
 }
 
 function parsePositiveInteger(value: string, key: string): number {

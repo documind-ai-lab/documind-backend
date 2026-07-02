@@ -1,4 +1,5 @@
 import { Module } from "@nestjs/common";
+import { S3Client } from "@aws-sdk/client-s3";
 import {
   APPLICATION_LOGGER,
   ApplicationLogger
@@ -34,6 +35,7 @@ import { OrphanDocumentCleanupScheduler } from "./infrastructure/orphan-document
 import { PrismaDocumentRepository } from "./infrastructure/prisma-document.repository";
 import { PrismaOrphanDocumentStorage } from "./infrastructure/prisma-orphan-document-storage";
 import { PrismaProjectAccessChecker } from "./infrastructure/prisma-project-access-checker";
+import { S3DocumentStorage } from "./infrastructure/s3-document-storage";
 import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infrastructure/prisma-project-document-summary-updater";
 
 @Module({
@@ -45,7 +47,30 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
     { provide: DOCUMENT_REPOSITORY, useClass: PrismaDocumentRepository },
     {
       provide: DOCUMENT_STORAGE,
-      useFactory: () => new LocalDocumentStorage(loadEnv().documentStorageBasePath)
+      useFactory: () => {
+        const env = loadEnv();
+
+        if (env.documentStorageProvider === "local") {
+          if (env.documentStorageBasePath === null) {
+            throw new Error("DOCUMENT_STORAGE_BASE_PATH 환경 변수가 필요합니다.");
+          }
+
+          return new LocalDocumentStorage(env.documentStorageBasePath);
+        }
+
+        if (env.documentStorageS3 === null) {
+          throw new Error("S3 문서 저장소 환경 변수가 필요합니다.");
+        }
+
+        return new S3DocumentStorage(
+          new S3Client({
+            region: env.documentStorageS3.region,
+            endpoint: env.documentStorageS3.endpoint ?? undefined,
+            forcePathStyle: env.documentStorageS3.forcePathStyle
+          }),
+          { bucket: env.documentStorageS3.bucket }
+        );
+      }
     },
     { provide: DOCUMENT_SECURITY_SCANNER, useClass: NoopDocumentSecurityScanner },
     { provide: ORPHAN_DOCUMENT_STORAGE, useClass: PrismaOrphanDocumentStorage },
@@ -80,6 +105,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
           summaryUpdater,
           securityScanner,
           filePolicy,
+          loadEnv().documentStorageProvider,
           clock,
           idGenerator,
           logger

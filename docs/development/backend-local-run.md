@@ -10,6 +10,7 @@
 DATABASE_URL="postgresql://documind_backend_app:<app_password>@localhost:5432/documind?schema=documind_backend"
 MIGRATION_DATABASE_URL="postgresql://documind_backend_migrator:<migrator_password>@localhost:5432/documind?schema=documind_backend"
 DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
+DOCUMENT_STORAGE_PROVIDER="local"
 DOCUMENT_STORAGE_BASE_PATH="./.storage/documents"
 DOCUMENT_MAX_FILE_BYTES="52428800"
 NODE_ENV="development"
@@ -27,7 +28,21 @@ DATABASE_URL="$MIGRATION_DATABASE_URL" npm run prisma:migrate:dev -- --name crea
 
 `prisma:migrate:dev`는 schema 변경 권한이 있는 migration 계정으로 실행한다. 일반 API 서버 실행은 runtime 계정인 `DATABASE_URL`을 사용한다.
 
-Document API를 사용하려면 `DOCUMENT_STORAGE_BASE_PATH`가 필요하다. 개발 환경에서는 상대 경로 예시를 사용할 수 있지만, 애플리케이션은 시작 시 현재 실행 위치 기준 절대 경로로 변환한다. 운영 또는 공유 서버에서는 `/var/lib/documind/documents`처럼 배포 디렉터리와 분리된 영속 볼륨 경로를 사용한다.
+Document API의 기본 저장소는 `DOCUMENT_STORAGE_PROVIDER="local"`이다. local provider를 사용할 때는 `DOCUMENT_STORAGE_BASE_PATH`가 필요하다. 개발 환경에서는 상대 경로 예시를 사용할 수 있지만, 애플리케이션은 시작 시 현재 실행 위치 기준 절대 경로로 변환한다. 운영 또는 공유 서버에서는 `/var/lib/documind/documents`처럼 배포 디렉터리와 분리된 영속 볼륨 경로를 사용한다.
+
+S3 호환 오브젝트 스토리지를 사용할 때는 다음 환경 변수를 추가한다.
+
+```env
+DOCUMENT_STORAGE_PROVIDER="s3"
+DOCUMENT_STORAGE_S3_BUCKET="documind-documents"
+DOCUMENT_STORAGE_S3_REGION="ap-northeast-2"
+DOCUMENT_STORAGE_S3_ENDPOINT=""
+DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE="false"
+```
+
+AWS S3를 직접 사용할 때는 `DOCUMENT_STORAGE_S3_ENDPOINT`를 빈 값으로 둔다. MinIO, Cloudflare R2처럼 endpoint가 있는 S3 호환 저장소를 사용할 때는 해당 endpoint를 넣고, MinIO처럼 path-style 접근이 필요한 환경에서는 `DOCUMENT_STORAGE_S3_FORCE_PATH_STYLE="true"`를 사용한다.
+
+S3 credential은 AWS SDK 기본 credential provider chain을 사용한다. 로컬 개발에서는 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` 또는 AWS profile을 사용할 수 있지만, 실제 access key와 secret key는 `.env`나 저장소 문서에 남기지 않는다.
 
 1차 MVP의 업로드 파일 보안 검사는 `DocumentSecurityScanner` port를 통해 실행된다. 로컬 기본 adapter는 `NoopDocumentSecurityScanner`이며 파일 내용을 저장하거나 외부 백신 엔진에 전달하지 않고 항상 clean 결과를 반환한다. 감염 의심 파일을 `FAILED` Document로 기록하고 원본 파일을 저장하지 않는 흐름은 테스트 fake scanner로 검증한다.
 

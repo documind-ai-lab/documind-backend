@@ -156,6 +156,7 @@ describe("Document use cases", () => {
       summaryUpdater,
       securityScanner,
       new DocumentFilePolicy({ maxFileBytes: 50 * 1024 * 1024 }),
+      "local",
       new FixedClock(now),
       idGenerator,
       logger
@@ -186,6 +187,30 @@ describe("Document use cases", () => {
     await expect(storage.exists(document.storageKey)).resolves.toBe(true);
     expect(accessChecker.writableRequests).toEqual([{ projectId, ownerId }]);
     expect(summaryUpdater.createdRequests).toEqual([{ projectId, ownerId, occurredAt: now }]);
+  });
+
+  it("storage provider가 s3이면 생성 Document의 storageProvider에 s3를 저장한다", async () => {
+    const s3UploadUseCase = new UploadDocumentUseCase(
+      repository,
+      storage,
+      orphanStorage,
+      accessChecker,
+      summaryUpdater,
+      securityScanner,
+      new DocumentFilePolicy({ maxFileBytes: 50 * 1024 * 1024 }),
+      "s3",
+      new FixedClock(now),
+      idGenerator,
+      logger
+    );
+
+    const document = await s3UploadUseCase.execute({
+      projectId,
+      ownerId,
+      file: pdfFile()
+    });
+
+    expect(document.storageProvider).toBe("s3");
   });
 
   it("Document 저장 실패 시 저장한 파일 삭제를 시도하고 삭제 실패는 orphan 후보로 기록한다", async () => {
