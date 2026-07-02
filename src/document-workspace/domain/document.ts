@@ -30,8 +30,18 @@ export type CreateDocumentInput = {
   now: Date;
 };
 
-export type CreateFailedDocumentInput = CreateDocumentInput & {
+export type CreateFailedDocumentInput = {
+  id: string;
+  projectId: string;
+  ownerId: string;
+  originalName: string;
+  storageProvider: string;
+  storageKey: string;
+  mimeType: string;
+  extension: string;
+  sizeBytes: number;
   failureReason: string;
+  now: Date;
 };
 
 export class Document {
@@ -113,5 +123,6 @@ function normalizeExtension(extension: string): string {
 }
 
 function normalizeFailureReason(reason: string): string {
-  return reason.trim();
+  const normalized = reason.trim();
+  return normalized;
 }
