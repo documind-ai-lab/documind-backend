@@ -30,6 +30,20 @@ export type CreateDocumentInput = {
   now: Date;
 };
 
+export type CreateFailedDocumentInput = {
+  id: string;
+  projectId: string;
+  ownerId: string;
+  originalName: string;
+  storageProvider: string;
+  storageKey: string;
+  mimeType: string;
+  extension: string;
+  sizeBytes: number;
+  failureReason: string;
+  now: Date;
+};
+
 export class Document {
   private constructor(private state: DocumentSnapshot) {}
 
@@ -46,6 +60,24 @@ export class Document {
       sizeBytes: input.sizeBytes,
       status: DocumentStatus.TEXT_EXTRACTION_PENDING,
       failureReason: null,
+      createdAt: input.now,
+      updatedAt: input.now
+    });
+  }
+
+  static createFailed(input: CreateFailedDocumentInput): Document {
+    return new Document({
+      id: input.id,
+      projectId: input.projectId,
+      ownerId: input.ownerId,
+      originalName: normalizeOriginalName(input.originalName),
+      storageProvider: input.storageProvider,
+      storageKey: input.storageKey,
+      mimeType: input.mimeType,
+      extension: normalizeExtension(input.extension),
+      sizeBytes: input.sizeBytes,
+      status: DocumentStatus.FAILED,
+      failureReason: normalizeFailureReason(input.failureReason),
       createdAt: input.now,
       updatedAt: input.now
     });
@@ -91,5 +123,6 @@ function normalizeExtension(extension: string): string {
 }
 
 function normalizeFailureReason(reason: string): string {
-  return reason.trim();
+  const normalized = reason.trim();
+  return normalized;
 }

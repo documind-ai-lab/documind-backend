@@ -39,6 +39,38 @@ describe("Document domain", () => {
     });
   });
 
+  it("보안 검사 실패 문서는 실패 상태와 실패 사유를 저장한다", () => {
+    const document = Document.createFailed({
+      id,
+      projectId,
+      ownerId,
+      originalName: "  A사 제안서.pdf  ",
+      storageProvider: "local",
+      storageKey: "projects/8d5f/documents/018f/018f.pdf",
+      mimeType: "application/pdf",
+      extension: "PDF",
+      sizeBytes: 1048576,
+      failureReason: "  악성 코드 의심 파일입니다.  ",
+      now
+    });
+
+    expect(document.snapshot()).toEqual({
+      id,
+      projectId,
+      ownerId,
+      originalName: "A사 제안서.pdf",
+      storageProvider: "local",
+      storageKey: "projects/8d5f/documents/018f/018f.pdf",
+      mimeType: "application/pdf",
+      extension: "pdf",
+      sizeBytes: 1048576,
+      status: DocumentStatus.FAILED,
+      failureReason: "악성 코드 의심 파일입니다.",
+      createdAt: now,
+      updatedAt: now
+    });
+  });
+
   it("실패한 문서는 재시도 대기 상태로 되돌리고 실패 사유를 비운다", () => {
     const document = failedDocument();
     const retriedAt = new Date("2026-07-01T02:00:00.000Z");
