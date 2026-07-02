@@ -2,7 +2,7 @@ import { Clock } from "../../shared/application/clock";
 import { IdGenerator } from "../../shared/application/id-generator";
 import { ApplicationLogger } from "../../shared/application/application-logger";
 import { PageResponse } from "../../shared/application/page-response";
-import { Document, DocumentSnapshot } from "../domain/document";
+import { CreateDocumentInput, Document, DocumentSnapshot } from "../domain/document";
 import { DocumentNotFoundError } from "../domain/document.errors";
 import { DocumentFileInput, DocumentFilePolicy } from "./document-file-policy";
 import { DocumentRepository } from "./document.repository";
@@ -58,7 +58,7 @@ export class UploadDocumentUseCase {
     const documentId = this.idGenerator.nextId();
     const storageKey = buildStorageKey(command.projectId, documentId, file.extension);
     const now = this.clock.now();
-    const baseDocumentInput = {
+    const baseDocumentInput: CreateDocumentInput = {
       id: documentId,
       projectId: command.projectId,
       ownerId: command.ownerId,

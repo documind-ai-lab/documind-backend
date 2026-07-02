@@ -286,6 +286,14 @@ git diff --check
 
 Expected: PASS.
 
+실행 결과:
+- `npm run lint`: PASS
+- `npm run typecheck`: PASS
+- `npm test`: PASS
+- `npm run test:e2e`: PASS
+- `git diff --check`: PASS
+- `RUN_DB_INTEGRATION=true npm run test:integration`: DB 주소 `192.168.50.3:5433` 접속 실패로 미완료
+
 - [x] **Step 3: 문서 금지어 검색**
 
 Run:
@@ -300,7 +308,7 @@ Expected: no matches.
 
 완료된 task의 checkbox를 실제 결과에 맞게 갱신한다.
 
-- [ ] **Step 5: 커밋**
+- [x] **Step 5: 커밋**
 
 ```bash
 git add docs/development/backend-local-run.md docs/specs/file-security-scan-implementation-plan.md

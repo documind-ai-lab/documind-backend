@@ -16,6 +16,7 @@ export type DocumentSecurityScanResult =
   | {
       status: "infected";
       reason: string;
+      signature?: string;
     };
 
 export interface DocumentSecurityScanner {
