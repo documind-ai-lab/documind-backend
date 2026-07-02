@@ -37,6 +37,17 @@ export type RetryDocumentResult =
   | { type: "success"; document: DocumentSnapshot }
   | { type: "conflict"; document: DocumentSnapshot; reason: string };
 
+export type CleanupOrphanDocumentsOptions = {
+  batchSize: number;
+  retryDelayMs: number;
+};
+
+export type CleanupOrphanDocumentsResult = {
+  scannedCount: number;
+  cleanedCount: number;
+  failedCount: number;
+};
+
 export class UploadDocumentUseCase {
   constructor(
     private readonly repository: DocumentRepository,
@@ -183,6 +194,47 @@ export class RetryDocumentUseCase {
 
     await this.repository.save(document);
     return { type: "success", document: document.snapshot() };
+  }
+}
+
+export class CleanupOrphanDocumentsUseCase {
+  constructor(
+    private readonly storage: DocumentStorage,
+    private readonly orphanStorage: OrphanDocumentStorage,
+    private readonly clock: Clock,
+    private readonly logger: ApplicationLogger,
+    private readonly options: CleanupOrphanDocumentsOptions
+  ) {}
+
+  async execute(): Promise<CleanupOrphanDocumentsResult> {
+    const now = this.clock.now();
+    const records = await this.orphanStorage.listDueCleanup(this.options.batchSize, now);
+    let cleanedCount = 0;
+    let failedCount = 0;
+
+    for (const record of records) {
+      try {
+        await this.storage.remove(record.storageKey);
+        await this.orphanStorage.resolve(record.storageKey, now);
+        cleanedCount += 1;
+      } catch (error) {
+        failedCount += 1;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const nextRetryAt = new Date(now.getTime() + this.options.retryDelayMs);
+        await this.orphanStorage.markFailed(record.storageKey, errorMessage, nextRetryAt, now);
+        this.logger.warn("고아 파일 정리 실패", {
+          storageKey: record.storageKey,
+          attemptCount: record.attemptCount + 1,
+          errorMessage
+        });
+      }
+    }
+
+    return {
+      scannedCount: records.length,
+      cleanedCount,
+      failedCount
+    };
   }
 }
 

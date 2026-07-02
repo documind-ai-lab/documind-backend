@@ -34,6 +34,13 @@ enum DocumentStatus {
   @@schema("documind_backend")
 }
 
+enum OrphanDocumentFileStatus {
+  PENDING
+  CLEANED
+
+  @@schema("documind_backend")
+}
+
 model Project {
   id                 String        @id @db.Uuid
   ownerId            String        @map("owner_id") @db.Uuid
@@ -71,5 +78,23 @@ model Document {
 
   @@index([projectId, createdAt, id], map: "idx_documents_project_created_id")
   @@map("documents")
+  @@schema("documind_backend")
+}
+
+model OrphanDocumentFile {
+  id              String                   @id @db.Uuid
+  storageProvider String                   @default("local") @map("storage_provider") @db.VarChar(32)
+  storageKey      String                   @unique @map("storage_key") @db.VarChar(1000)
+  reason          String                   @db.VarChar(100)
+  status          OrphanDocumentFileStatus @default(PENDING)
+  attemptCount    Int                      @default(0) @map("attempt_count")
+  lastError       String?                  @map("last_error") @db.VarChar(1000)
+  nextRetryAt     DateTime                 @map("next_retry_at") @db.Timestamptz(6)
+  cleanedAt       DateTime?                @map("cleaned_at") @db.Timestamptz(6)
+  createdAt       DateTime                 @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime                 @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, nextRetryAt, createdAt, storageKey], map: "idx_orphan_document_files_due")
+  @@map("orphan_document_files")
   @@schema("documind_backend")
 }

@@ -8,6 +8,7 @@ import {
   GetDocumentUseCase,
   ListDocumentsUseCase,
   RetryDocumentUseCase,
+  CleanupOrphanDocumentsUseCase,
   UploadDocumentUseCase
 } from "../src/document-workspace/application/document.use-cases";
 import { DocumentStatus } from "../src/document-workspace/domain/document-status";
@@ -364,6 +365,81 @@ describe("Document use cases", () => {
       failureReason: null
     });
   });
+
+  it("고아 파일 정리 대상 파일 삭제가 성공하면 후보를 resolved 처리한다", async () => {
+    const cleanupUseCase = new CleanupOrphanDocumentsUseCase(
+      storage,
+      orphanStorage,
+      new FixedClock(now),
+      logger,
+      { batchSize: 10, retryDelayMs: 600000 }
+    );
+    const storageKey = "projects/p1/documents/d1/d1.pdf";
+    await storage.put(storageKey, Buffer.from("orphan"));
+    orphanStorage.dueRecords.push({
+      storageKey,
+      reason: "DOCUMENT_CREATE_FAILED_CLEANUP_FAILED",
+      attemptCount: 0
+    });
+
+    const result = await cleanupUseCase.execute();
+
+    expect(result).toEqual({ scannedCount: 1, cleanedCount: 1, failedCount: 0 });
+    await expect(storage.exists(storageKey)).resolves.toBe(false);
+    expect(orphanStorage.resolvedRecords).toEqual([{ storageKey, resolvedAt: now }]);
+  });
+
+  it("고아 파일 삭제 실패는 retry 정보를 기록하고 다음 후보 처리를 계속한다", async () => {
+    const cleanupUseCase = new CleanupOrphanDocumentsUseCase(
+      storage,
+      orphanStorage,
+      new FixedClock(now),
+      logger,
+      { batchSize: 10, retryDelayMs: 600000 }
+    );
+    const failedStorageKey = "projects/p1/documents/d1/d1.pdf";
+    const cleanedStorageKey = "projects/p1/documents/d2/d2.pdf";
+    await storage.put(failedStorageKey, Buffer.from("failed orphan"));
+    await storage.put(cleanedStorageKey, Buffer.from("cleaned orphan"));
+    storage.failRemoveKeys.add(failedStorageKey);
+    orphanStorage.dueRecords.push(
+      {
+        storageKey: failedStorageKey,
+        reason: "DOCUMENT_CREATE_FAILED_CLEANUP_FAILED",
+        attemptCount: 2
+      },
+      {
+        storageKey: cleanedStorageKey,
+        reason: "DOCUMENT_CREATE_FAILED_CLEANUP_FAILED",
+        attemptCount: 0
+      }
+    );
+
+    const result = await cleanupUseCase.execute();
+
+    expect(result).toEqual({ scannedCount: 2, cleanedCount: 1, failedCount: 1 });
+    await expect(storage.exists(failedStorageKey)).resolves.toBe(true);
+    await expect(storage.exists(cleanedStorageKey)).resolves.toBe(false);
+    expect(orphanStorage.failedRecords).toEqual([
+      {
+        storageKey: failedStorageKey,
+        errorMessage: "remove failed",
+        nextRetryAt: new Date("2026-07-02T01:10:00.000Z"),
+        failedAt: now
+      }
+    ]);
+    expect(orphanStorage.resolvedRecords).toEqual([{ storageKey: cleanedStorageKey, resolvedAt: now }]);
+    expect(logger.warns).toEqual([
+      {
+        message: "고아 파일 정리 실패",
+        metadata: {
+          storageKey: failedStorageKey,
+          attemptCount: 3,
+          errorMessage: "remove failed"
+        }
+      }
+    ]);
+  });
 });
 
 function pdfFile(originalName = "제안서.pdf") {
@@ -442,17 +518,39 @@ class FakeDocumentSecurityScanner implements DocumentSecurityScanner {
 
 class FakeOrphanDocumentStorage {
   readonly records: Array<{ storageKey: string; reason: string }> = [];
+  readonly dueRecords: Array<{ storageKey: string; reason: string; attemptCount: number }> = [];
+  readonly resolvedRecords: Array<{ storageKey: string; resolvedAt: Date }> = [];
+  readonly failedRecords: Array<{
+    storageKey: string;
+    errorMessage: string;
+    nextRetryAt: Date;
+    failedAt: Date;
+  }> = [];
 
   async record(storageKey: string, reason: string): Promise<void> {
     this.records.push({ storageKey, reason });
   }
 
-  async resolve(storageKey: string): Promise<void> {
+  async listDueCleanup(limit: number): Promise<Array<{ storageKey: string; reason: string; attemptCount: number }>> {
+    return this.dueRecords.slice(0, limit);
+  }
+
+  async resolve(storageKey: string, resolvedAt: Date): Promise<void> {
+    this.resolvedRecords.push({ storageKey, resolvedAt });
     const index = this.records.findIndex((record) => record.storageKey === storageKey);
 
     if (index >= 0) {
       this.records.splice(index, 1);
     }
+  }
+
+  async markFailed(
+    storageKey: string,
+    errorMessage: string,
+    nextRetryAt: Date,
+    failedAt: Date
+  ): Promise<void> {
+    this.failedRecords.push({ storageKey, errorMessage, nextRetryAt, failedAt });
   }
 }
 

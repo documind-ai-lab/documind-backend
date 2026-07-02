@@ -21,6 +21,7 @@ import {
 import { DOCUMENT_REPOSITORY, DocumentRepository } from "./application/document.repository";
 import { PROJECT_ACCESS_CHECKER, ProjectAccessChecker } from "./application/project-access-checker";
 import {
+  CleanupOrphanDocumentsUseCase,
   GetDocumentUseCase,
   ListDocumentsUseCase,
   RetryDocumentUseCase,
@@ -29,8 +30,9 @@ import {
 import { DocumentController } from "./interface/document.controller";
 import { LocalDocumentStorage } from "./infrastructure/local-document-storage";
 import { NoopDocumentSecurityScanner } from "./infrastructure/noop-document-security-scanner";
-import { NoopOrphanDocumentStorage } from "./infrastructure/noop-orphan-document-storage";
+import { OrphanDocumentCleanupScheduler } from "./infrastructure/orphan-document-cleanup-scheduler";
 import { PrismaDocumentRepository } from "./infrastructure/prisma-document.repository";
+import { PrismaOrphanDocumentStorage } from "./infrastructure/prisma-orphan-document-storage";
 import { PrismaProjectAccessChecker } from "./infrastructure/prisma-project-access-checker";
 import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infrastructure/prisma-project-document-summary-updater";
 
@@ -46,7 +48,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
       useFactory: () => new LocalDocumentStorage(loadEnv().documentStorageBasePath)
     },
     { provide: DOCUMENT_SECURITY_SCANNER, useClass: NoopDocumentSecurityScanner },
-    { provide: ORPHAN_DOCUMENT_STORAGE, useClass: NoopOrphanDocumentStorage },
+    { provide: ORPHAN_DOCUMENT_STORAGE, useClass: PrismaOrphanDocumentStorage },
     { provide: PROJECT_ACCESS_CHECKER, useClass: PrismaProjectAccessChecker },
     {
       provide: PROJECT_DOCUMENT_SUMMARY_UPDATER,
@@ -116,6 +118,36 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         clock: Clock
       ) => new RetryDocumentUseCase(repository, storage, accessChecker, clock),
       inject: [DOCUMENT_REPOSITORY, DOCUMENT_STORAGE, PROJECT_ACCESS_CHECKER, CLOCK]
+    },
+    {
+      provide: CleanupOrphanDocumentsUseCase,
+      useFactory: (
+        storage: DocumentStorage,
+        orphanStorage: OrphanDocumentStorage,
+        clock: Clock,
+        logger: ApplicationLogger
+      ) => {
+        const env = loadEnv();
+        return new CleanupOrphanDocumentsUseCase(storage, orphanStorage, clock, logger, {
+          batchSize: env.orphanDocumentCleanupBatchSize,
+          retryDelayMs: env.orphanDocumentCleanupRetryDelayMs
+        });
+      },
+      inject: [DOCUMENT_STORAGE, ORPHAN_DOCUMENT_STORAGE, CLOCK, APPLICATION_LOGGER]
+    },
+    {
+      provide: OrphanDocumentCleanupScheduler,
+      useFactory: (
+        cleanupUseCase: CleanupOrphanDocumentsUseCase,
+        logger: ApplicationLogger
+      ) => {
+        const env = loadEnv();
+        return new OrphanDocumentCleanupScheduler(cleanupUseCase, logger, {
+          enabled: env.orphanDocumentCleanupEnabled,
+          intervalMs: env.orphanDocumentCleanupIntervalMs
+        });
+      },
+      inject: [CleanupOrphanDocumentsUseCase, APPLICATION_LOGGER]
     }
   ],
   exports: [DOCUMENT_REPOSITORY, PROJECT_ACCESS_CHECKER, PROJECT_DOCUMENT_SUMMARY_UPDATER]

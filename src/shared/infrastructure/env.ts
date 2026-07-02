@@ -4,6 +4,10 @@ export type AppEnv = {
   databaseUrl: string;
   demoOwnerId: string;
   documentMaxFileBytes: number;
+  orphanDocumentCleanupBatchSize: number;
+  orphanDocumentCleanupEnabled: boolean;
+  orphanDocumentCleanupIntervalMs: number;
+  orphanDocumentCleanupRetryDelayMs: number;
   documentStorageBasePath: string;
   nodeEnv: string;
   port: number;
@@ -14,6 +18,22 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
   const demoOwnerId = requireEnv(env, "DOCUMIND_DEMO_OWNER_ID");
   const documentStorageBasePath = resolve(requireEnv(env, "DOCUMENT_STORAGE_BASE_PATH"));
   const documentMaxFileBytes = Number(requireEnv(env, "DOCUMENT_MAX_FILE_BYTES"));
+  const orphanDocumentCleanupEnabled = parseBoolean(
+    env.ORPHAN_DOCUMENT_CLEANUP_ENABLED ?? "false",
+    "ORPHAN_DOCUMENT_CLEANUP_ENABLED"
+  );
+  const orphanDocumentCleanupIntervalMs = parsePositiveInteger(
+    env.ORPHAN_DOCUMENT_CLEANUP_INTERVAL_MS ?? "600000",
+    "ORPHAN_DOCUMENT_CLEANUP_INTERVAL_MS"
+  );
+  const orphanDocumentCleanupBatchSize = parsePositiveInteger(
+    env.ORPHAN_DOCUMENT_CLEANUP_BATCH_SIZE ?? "50",
+    "ORPHAN_DOCUMENT_CLEANUP_BATCH_SIZE"
+  );
+  const orphanDocumentCleanupRetryDelayMs = parsePositiveInteger(
+    env.ORPHAN_DOCUMENT_CLEANUP_RETRY_DELAY_MS ?? "600000",
+    "ORPHAN_DOCUMENT_CLEANUP_RETRY_DELAY_MS"
+  );
   const port = Number(env.PORT ?? 3000);
 
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
@@ -32,6 +52,10 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
     databaseUrl,
     demoOwnerId,
     documentMaxFileBytes,
+    orphanDocumentCleanupBatchSize,
+    orphanDocumentCleanupEnabled,
+    orphanDocumentCleanupIntervalMs,
+    orphanDocumentCleanupRetryDelayMs,
     documentStorageBasePath,
     nodeEnv: env.NODE_ENV ?? "development",
     port
@@ -46,6 +70,28 @@ function requireEnv(env: NodeJS.ProcessEnv, key: string): string {
   }
 
   return value;
+}
+
+function parseBoolean(value: string, key: string): boolean {
+  if (value === "true") {
+    return true;
+  }
+
+  if (value === "false") {
+    return false;
+  }
+
+  throw new Error(`${key}는 true 또는 false여야 합니다.`);
+}
+
+function parsePositiveInteger(value: string, key: string): number {
+  const parsed = Number(value);
+
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    throw new Error(`${key}는 1 이상의 정수여야 합니다.`);
+  }
+
+  return parsed;
 }
 
 function isUuid(value: string): boolean {
