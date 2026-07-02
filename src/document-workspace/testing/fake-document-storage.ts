@@ -3,6 +3,7 @@ import { DocumentStorage } from "../application/document-storage";
 export class FakeDocumentStorage implements DocumentStorage {
   private readonly files = new Map<string, Buffer>();
   readonly removedKeys: string[] = [];
+  readonly failRemoveKeys = new Set<string>();
   failRemove = false;
 
   async put(storageKey: string, content: Buffer): Promise<void> {
@@ -16,7 +17,7 @@ export class FakeDocumentStorage implements DocumentStorage {
   async remove(storageKey: string): Promise<void> {
     this.removedKeys.push(storageKey);
 
-    if (this.failRemove) {
+    if (this.failRemove || this.failRemoveKeys.has(storageKey)) {
       throw new Error("remove failed");
     }
 
