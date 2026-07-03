@@ -57,6 +57,7 @@ export class UploadDocumentUseCase {
     private readonly summaryUpdater: ProjectDocumentSummaryUpdater,
     private readonly securityScanner: DocumentSecurityScanner,
     private readonly filePolicy: DocumentFilePolicy,
+    private readonly storageProvider: string,
     private readonly clock: Clock,
     private readonly idGenerator: IdGenerator,
     private readonly logger: ApplicationLogger
@@ -74,7 +75,7 @@ export class UploadDocumentUseCase {
       projectId: command.projectId,
       ownerId: command.ownerId,
       originalName: file.originalName,
-      storageProvider: "local",
+      storageProvider: this.storageProvider,
       storageKey,
       mimeType: file.mimeType,
       extension: file.extension,

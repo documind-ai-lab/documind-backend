@@ -51,6 +51,10 @@ describe("document storage env", () => {
       PORT: "3000"
     });
 
+    expect(env.documentStorageBasePath).not.toBeNull();
+    if (env.documentStorageBasePath === null) {
+      throw new Error("local provider는 documentStorageBasePath를 반환해야 합니다.");
+    }
     expect(isAbsolute(env.documentStorageBasePath)).toBe(true);
     expect(env.documentStorageBasePath.endsWith(".storage/documents")).toBe(true);
   });
