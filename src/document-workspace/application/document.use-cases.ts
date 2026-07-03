@@ -319,7 +319,7 @@ export class ProcessPlainTextExtractionUseCase {
     const extractingDocument = await this.startUseCase.execute(command);
 
     try {
-      const content = await this.storage.read(extractingDocument.storageKey);
+      const content = await this.readSourceContent(extractingDocument.storageKey);
       const extracted = this.extractor.extract({
         extension: extractingDocument.extension,
         content
@@ -336,6 +336,14 @@ export class ProcessPlainTextExtractionUseCase {
       const failedDocument = await this.failUseCase.execute({ ...command, reason });
 
       return { type: "failed", document: failedDocument, reason };
+    }
+  }
+
+  private async readSourceContent(storageKey: string): Promise<Buffer> {
+    try {
+      return await this.storage.read(storageKey);
+    } catch {
+      throw new DocumentStorageReadError();
     }
   }
 }
@@ -426,13 +434,23 @@ function normalizeTokenCount(tokenCount: number | undefined): number | null {
 }
 
 function plainTextExtractionFailureReason(error: unknown): string {
-  if (error instanceof DocumentTextValidationError || error instanceof DocumentTextExtractionError) {
+  if (
+    error instanceof DocumentStorageReadError ||
+    error instanceof DocumentTextValidationError ||
+    error instanceof DocumentTextExtractionError
+  ) {
     return error.message;
   }
 
-  return "원본 파일을 읽을 수 없습니다.";
+  return "텍스트 추출 처리 중 오류가 발생했습니다.";
 }
 
 function hashContent(content: string): string {
   return createHash("sha256").update(content).digest("hex");
+}
+
+class DocumentStorageReadError extends Error {
+  constructor() {
+    super("원본 파일을 읽을 수 없습니다.");
+  }
 }

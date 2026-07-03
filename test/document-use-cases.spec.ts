@@ -17,6 +17,7 @@ import {
   UploadDocumentUseCase
 } from "../src/document-workspace/application/document.use-cases";
 import { PlainTextDocumentTextExtractor } from "../src/document-workspace/infrastructure/plain-text-document-text-extractor";
+import { DocumentTextExtractor } from "../src/document-workspace/application/document-text-extractor";
 import { DocumentStatus } from "../src/document-workspace/domain/document-status";
 import {
   DocumentFileValidationError,
@@ -628,6 +629,25 @@ describe("Document use cases", () => {
     await expect(documentTextRepository.findByDocumentId(document.id)).resolves.toBeNull();
   });
 
+  it("plain text 추출 use case는 알 수 없는 추출 오류를 파일 읽기 실패로 오인하지 않는다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: textFile() });
+    const processUseCase = createProcessPlainTextExtractionUseCase({
+      extractor: {
+        supports: () => true,
+        extract: () => {
+          throw new Error("unexpected parser error");
+        }
+      }
+    });
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+
+    expect(result).toMatchObject({
+      type: "failed",
+      reason: "텍스트 추출 처리 중 오류가 발생했습니다."
+    });
+  });
+
   it("고아 파일 정리 대상 파일 삭제가 성공하면 후보를 resolved 처리한다", async () => {
     const cleanupUseCase = new CleanupOrphanDocumentsUseCase(
       storage,
@@ -703,7 +723,7 @@ describe("Document use cases", () => {
     ]);
   });
 
-  function createProcessPlainTextExtractionUseCase() {
+  function createProcessPlainTextExtractionUseCase(options?: { extractor?: DocumentTextExtractor }) {
     return new ProcessPlainTextExtractionUseCase(
       new GetDocumentUseCase(repository, accessChecker),
       new StartTextExtractionUseCase(repository, accessChecker, new FixedClock(now)),
@@ -716,7 +736,7 @@ describe("Document use cases", () => {
       ),
       new FailTextExtractionUseCase(repository, accessChecker, new FixedClock(now)),
       storage,
-      new PlainTextDocumentTextExtractor()
+      options?.extractor ?? new PlainTextDocumentTextExtractor()
     );
   }
 });
