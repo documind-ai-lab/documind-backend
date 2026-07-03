@@ -30,8 +30,8 @@
   - S3 command 전송과 404 exists 처리 검증
 - Modify: `test/document-use-cases.spec.ts`
   - `storageProvider: "s3"` 저장 동작 검증
-- Modify: `test/document-api.e2e-spec.ts`
-  - `UploadDocumentUseCase` 생성자 변경에 따른 테스트 wiring 유지
+- Verify: `test/document-api.e2e-spec.ts`
+  - `UploadDocumentUseCase`를 직접 생성하지 않으므로 파일 수정 없이 e2e 회귀 검증만 수행
 
 ## Task 1: Dependency and env contract
 
@@ -99,7 +99,7 @@ Expected: PASS.
 - Modify: `src/document-workspace/application/document.use-cases.ts`
 - Modify: `src/document-workspace/document-workspace.module.ts`
 - Modify: `test/document-use-cases.spec.ts`
-- Modify: `test/document-api.e2e-spec.ts`
+- Verify: `test/document-api.e2e-spec.ts`
 
 - [x] **Step 1: Write failing provider persistence test**
 
@@ -121,9 +121,11 @@ Expected: FAIL because upload use case still writes `"local"`.
 
 - [x] **Step 5: Run document tests**
 
-Run: `npm test -- document-use-cases.spec.ts document-api.e2e-spec.ts`
+Run: `npm test -- document-use-cases.spec.ts`
 
 Expected: PASS.
+
+Note: `test/document-api.e2e-spec.ts`는 `UploadDocumentUseCase`를 직접 인스턴스화하지 않고 `DocumentWorkspaceModule`의 provider wiring을 사용한다. 생성자 변경에 따른 파일 수정은 필요하지 않으며, 최종 검증 단계의 `npm run test:e2e`로 회귀 여부를 확인한다.
 
 ## Task 4: Documentation and final verification
 
