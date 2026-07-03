@@ -247,11 +247,11 @@ export class CompleteTextExtractionUseCase {
       command.projectId,
       command.documentId
     );
-    const content = normalizeDocumentTextContent(command.content);
-    const tokenCount = normalizeTokenCount(command.tokenCount);
     const now = this.clock.now();
 
     document.markTextExtractionReady(now);
+    const content = normalizeDocumentTextContent(command.content);
+    const tokenCount = normalizeTokenCount(command.tokenCount);
     await this.documentTextRepository.saveExtractionResult(document, {
       id: this.idGenerator.nextId(),
       documentId: command.documentId,

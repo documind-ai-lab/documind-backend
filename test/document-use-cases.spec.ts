@@ -514,6 +514,26 @@ describe("Document use cases", () => {
     ).rejects.toThrow(DocumentStateConflictError);
   });
 
+  it("텍스트 추출 성공 use case는 잘못된 상태이면 content 검증보다 상태 충돌을 먼저 반환한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const completeUseCase = new CompleteTextExtractionUseCase(
+      repository,
+      documentTextRepository,
+      accessChecker,
+      new FixedClock(now),
+      new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000201"])
+    );
+
+    await expect(
+      completeUseCase.execute({
+        projectId,
+        ownerId,
+        documentId: document.id,
+        content: "   "
+      })
+    ).rejects.toThrow(DocumentStateConflictError);
+  });
+
   it("고아 파일 정리 대상 파일 삭제가 성공하면 후보를 resolved 처리한다", async () => {
     const cleanupUseCase = new CleanupOrphanDocumentsUseCase(
       storage,
