@@ -4,6 +4,7 @@ import request from "supertest";
 import { CLOCK, Clock } from "../src/shared/application/clock";
 import { ID_GENERATOR, IdGenerator } from "../src/shared/application/id-generator";
 import { DocumentWorkspaceModule } from "../src/document-workspace/document-workspace.module";
+import { ProcessPlainTextExtractionUseCase } from "../src/document-workspace/application/document.use-cases";
 import { DOCUMENT_REPOSITORY } from "../src/document-workspace/application/document.repository";
 import {
   DOCUMENT_SECURITY_SCANNER,
@@ -12,6 +13,7 @@ import {
   DocumentSecurityScanner
 } from "../src/document-workspace/application/document-security-scanner";
 import { DOCUMENT_STORAGE } from "../src/document-workspace/application/document-storage";
+import { DOCUMENT_TEXT_EXTRACTOR } from "../src/document-workspace/application/document-text-extractor";
 import { DOCUMENT_TEXT_REPOSITORY } from "../src/document-workspace/application/document-text.repository";
 import { ORPHAN_DOCUMENT_STORAGE } from "../src/document-workspace/application/orphan-document-storage";
 import { PROJECT_ACCESS_CHECKER } from "../src/document-workspace/application/project-access-checker";
@@ -21,6 +23,7 @@ import { DocumentSecurityScanUnavailableError } from "../src/document-workspace/
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
 import { InMemoryDocumentRepository } from "../src/document-workspace/testing/in-memory-document.repository";
 import { InMemoryDocumentTextRepository } from "../src/document-workspace/testing/in-memory-document-text.repository";
+import { PlainTextDocumentTextExtractor } from "../src/document-workspace/infrastructure/plain-text-document-text-extractor";
 import { ProjectNotFoundError, ProjectStateConflictError } from "../src/project-workspace/domain/project.errors";
 import { HttpExceptionFilter } from "../src/shared/interface/http-exception.filter";
 
@@ -62,6 +65,8 @@ describe("Document API", () => {
       .useValue(repository)
       .overrideProvider(DOCUMENT_TEXT_REPOSITORY)
       .useValue(new InMemoryDocumentTextRepository())
+      .overrideProvider(DOCUMENT_TEXT_EXTRACTOR)
+      .useValue(new PlainTextDocumentTextExtractor())
       .overrideProvider(DOCUMENT_STORAGE)
       .useValue(storage)
       .overrideProvider(DOCUMENT_SECURITY_SCANNER)
@@ -93,6 +98,10 @@ describe("Document API", () => {
 
   afterEach(async () => {
     await app.close();
+  });
+
+  it("plain text 처리 use case provider를 resolve할 수 있다", () => {
+    expect(app.get(ProcessPlainTextExtractionUseCase)).toBeInstanceOf(ProcessPlainTextExtractionUseCase);
   });
 
   it("업로드, 목록, 상세, 재시도 흐름과 응답 shape을 검증한다", async () => {

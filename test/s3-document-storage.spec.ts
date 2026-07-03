@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand
 } from "@aws-sdk/client-s3";
@@ -66,6 +67,26 @@ describe("S3DocumentStorage", () => {
     const storage = new S3DocumentStorage(client, { bucket: "documind-documents" });
 
     await expect(storage.exists("projects/p1/documents/d1/d1.pdf")).rejects.toBeNull();
+  });
+
+  it("read는 GetObjectCommand로 object body를 Buffer로 반환한다", async () => {
+    const client = createS3Client();
+    client.send.mockResolvedValueOnce({
+      Body: {
+        transformToByteArray: async () => new Uint8Array(Buffer.from("회의록"))
+      }
+    });
+    const storage = new S3DocumentStorage(client, { bucket: "documind-documents" });
+
+    await expect(storage.read("projects/p1/documents/d1/d1.txt")).resolves.toEqual(
+      Buffer.from("회의록")
+    );
+
+    expect(client.send.mock.calls[0][0]).toBeInstanceOf(GetObjectCommand);
+    expect(getCommandInput(client)).toEqual({
+      Bucket: "documind-documents",
+      Key: "projects/p1/documents/d1/d1.txt"
+    });
   });
 
   it("remove는 DeleteObjectCommand로 object 삭제를 요청한다", async () => {

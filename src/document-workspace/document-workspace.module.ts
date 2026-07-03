@@ -9,6 +9,7 @@ import { ID_GENERATOR, IdGenerator, UuidV7Generator } from "../shared/applicatio
 import { loadEnv } from "../shared/infrastructure/env";
 import { NestApplicationLogger } from "../shared/infrastructure/nest-application-logger";
 import { DOCUMENT_STORAGE, DocumentStorage } from "./application/document-storage";
+import { DOCUMENT_TEXT_EXTRACTOR, DocumentTextExtractor } from "./application/document-text-extractor";
 import { DOCUMENT_TEXT_REPOSITORY, DocumentTextRepository } from "./application/document-text.repository";
 import { DocumentFilePolicy } from "./application/document-file-policy";
 import { ORPHAN_DOCUMENT_STORAGE, OrphanDocumentStorage } from "./application/orphan-document-storage";
@@ -28,6 +29,7 @@ import {
   FailTextExtractionUseCase,
   GetDocumentUseCase,
   ListDocumentsUseCase,
+  ProcessPlainTextExtractionUseCase,
   RetryDocumentUseCase,
   StartTextExtractionUseCase,
   UploadDocumentUseCase
@@ -36,6 +38,7 @@ import { DocumentController } from "./interface/document.controller";
 import { LocalDocumentStorage } from "./infrastructure/local-document-storage";
 import { NoopDocumentSecurityScanner } from "./infrastructure/noop-document-security-scanner";
 import { OrphanDocumentCleanupScheduler } from "./infrastructure/orphan-document-cleanup-scheduler";
+import { PlainTextDocumentTextExtractor } from "./infrastructure/plain-text-document-text-extractor";
 import { PrismaDocumentRepository } from "./infrastructure/prisma-document.repository";
 import { PrismaDocumentTextRepository } from "./infrastructure/prisma-document-text.repository";
 import { PrismaOrphanDocumentStorage } from "./infrastructure/prisma-orphan-document-storage";
@@ -51,6 +54,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
     { provide: APPLICATION_LOGGER, useClass: NestApplicationLogger },
     { provide: DOCUMENT_REPOSITORY, useClass: PrismaDocumentRepository },
     { provide: DOCUMENT_TEXT_REPOSITORY, useClass: PrismaDocumentTextRepository },
+    { provide: DOCUMENT_TEXT_EXTRACTOR, useClass: PlainTextDocumentTextExtractor },
     {
       provide: DOCUMENT_STORAGE,
       useFactory: () => {
@@ -186,6 +190,33 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         clock: Clock
       ) => new FailTextExtractionUseCase(repository, accessChecker, clock),
       inject: [DOCUMENT_REPOSITORY, PROJECT_ACCESS_CHECKER, CLOCK]
+    },
+    {
+      provide: ProcessPlainTextExtractionUseCase,
+      useFactory: (
+        getDocumentUseCase: GetDocumentUseCase,
+        startUseCase: StartTextExtractionUseCase,
+        completeUseCase: CompleteTextExtractionUseCase,
+        failUseCase: FailTextExtractionUseCase,
+        storage: DocumentStorage,
+        extractor: DocumentTextExtractor
+      ) =>
+        new ProcessPlainTextExtractionUseCase(
+          getDocumentUseCase,
+          startUseCase,
+          completeUseCase,
+          failUseCase,
+          storage,
+          extractor
+        ),
+      inject: [
+        GetDocumentUseCase,
+        StartTextExtractionUseCase,
+        CompleteTextExtractionUseCase,
+        FailTextExtractionUseCase,
+        DOCUMENT_STORAGE,
+        DOCUMENT_TEXT_EXTRACTOR
+      ]
     },
     {
       provide: CleanupOrphanDocumentsUseCase,

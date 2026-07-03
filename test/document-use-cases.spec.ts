@@ -10,11 +10,14 @@ import {
   GetDocumentUseCase,
   FailTextExtractionUseCase,
   ListDocumentsUseCase,
+  ProcessPlainTextExtractionUseCase,
   RetryDocumentUseCase,
   StartTextExtractionUseCase,
   CleanupOrphanDocumentsUseCase,
   UploadDocumentUseCase
 } from "../src/document-workspace/application/document.use-cases";
+import { PlainTextDocumentTextExtractor } from "../src/document-workspace/infrastructure/plain-text-document-text-extractor";
+import { DocumentTextExtractor } from "../src/document-workspace/application/document-text-extractor";
 import { DocumentStatus } from "../src/document-workspace/domain/document-status";
 import {
   DocumentFileValidationError,
@@ -534,6 +537,117 @@ describe("Document use cases", () => {
     ).rejects.toThrow(DocumentStateConflictError);
   });
 
+  it("plain text 추출 use case는 TXT 원본을 읽어 텍스트를 저장하고 문서를 준비 상태로 전환한다", async () => {
+    const document = await uploadUseCase.execute({
+      projectId,
+      ownerId,
+      file: textFile("회의록.txt", "  회의 내용\n결정 사항  ")
+    });
+    const processUseCase = createProcessPlainTextExtractionUseCase();
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const text = await documentTextRepository.findByDocumentId(document.id);
+
+    expect(result.type).toBe("completed");
+    expect(result.document.status).toBe(DocumentStatus.READY);
+    expect(text).toMatchObject({
+      documentId: document.id,
+      projectId,
+      ownerId,
+      content: "회의 내용\n결정 사항",
+      tokenCount: null
+    });
+  });
+
+  it("plain text 추출 use case는 CSV 원본을 구조화하지 않고 원문 텍스트로 저장한다", async () => {
+    const document = await uploadUseCase.execute({
+      projectId,
+      ownerId,
+      file: textFile("견적.csv", "품목,금액\n개발,1000")
+    });
+    const processUseCase = createProcessPlainTextExtractionUseCase();
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const text = await documentTextRepository.findByDocumentId(document.id);
+
+    expect(result.type).toBe("completed");
+    expect(result.document.status).toBe(DocumentStatus.READY);
+    expect(text?.content).toBe("품목,금액\n개발,1000");
+  });
+
+  it("plain text 추출 use case는 지원하지 않는 확장자를 건너뛰고 상태를 변경하지 않는다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const processUseCase = createProcessPlainTextExtractionUseCase();
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+
+    expect(result).toEqual({
+      type: "skipped",
+      document,
+      reason: "지원하지 않는 텍스트 추출 형식입니다."
+    });
+    expect(saved!.snapshot().status).toBe(DocumentStatus.TEXT_EXTRACTION_PENDING);
+    await expect(documentTextRepository.findByDocumentId(document.id)).resolves.toBeNull();
+  });
+
+  it("plain text 추출 use case는 원본 파일 읽기 실패 시 문서를 실패 상태로 저장한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: textFile() });
+    await storage.remove(document.storageKey);
+    const processUseCase = createProcessPlainTextExtractionUseCase();
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+
+    expect(result).toEqual({
+      type: "failed",
+      document: saved!.snapshot(),
+      reason: "원본 파일을 읽을 수 없습니다."
+    });
+    expect(saved!.snapshot()).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "원본 파일을 읽을 수 없습니다."
+    });
+  });
+
+  it("plain text 추출 use case는 빈 추출 텍스트를 실패 상태로 저장한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: textFile("빈파일.txt", "   \n\t   ") });
+    const processUseCase = createProcessPlainTextExtractionUseCase();
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+
+    expect(result).toEqual({
+      type: "failed",
+      document: saved!.snapshot(),
+      reason: "추출 텍스트가 비어 있습니다."
+    });
+    expect(saved!.snapshot()).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "추출 텍스트가 비어 있습니다."
+    });
+    await expect(documentTextRepository.findByDocumentId(document.id)).resolves.toBeNull();
+  });
+
+  it("plain text 추출 use case는 알 수 없는 추출 오류를 파일 읽기 실패로 오인하지 않는다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: textFile() });
+    const processUseCase = createProcessPlainTextExtractionUseCase({
+      extractor: {
+        supports: () => true,
+        extract: () => {
+          throw new Error("unexpected parser error");
+        }
+      }
+    });
+
+    const result = await processUseCase.execute({ projectId, ownerId, documentId: document.id });
+
+    expect(result).toMatchObject({
+      type: "failed",
+      reason: "텍스트 추출 처리 중 오류가 발생했습니다."
+    });
+  });
+
   it("고아 파일 정리 대상 파일 삭제가 성공하면 후보를 resolved 처리한다", async () => {
     const cleanupUseCase = new CleanupOrphanDocumentsUseCase(
       storage,
@@ -608,6 +722,23 @@ describe("Document use cases", () => {
       }
     ]);
   });
+
+  function createProcessPlainTextExtractionUseCase(options?: { extractor?: DocumentTextExtractor }) {
+    return new ProcessPlainTextExtractionUseCase(
+      new GetDocumentUseCase(repository, accessChecker),
+      new StartTextExtractionUseCase(repository, accessChecker, new FixedClock(now)),
+      new CompleteTextExtractionUseCase(
+        repository,
+        documentTextRepository,
+        accessChecker,
+        new FixedClock(now),
+        new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000201"])
+      ),
+      new FailTextExtractionUseCase(repository, accessChecker, new FixedClock(now)),
+      storage,
+      options?.extractor ?? new PlainTextDocumentTextExtractor()
+    );
+  }
 });
 
 function pdfFile(originalName = "제안서.pdf") {
@@ -616,6 +747,18 @@ function pdfFile(originalName = "제안서.pdf") {
     mimeType: "application/pdf",
     sizeBytes: 8,
     buffer: Buffer.from("%PDF-1.7")
+  };
+}
+
+function textFile(originalName = "회의록.txt", content = "회의 내용") {
+  const buffer = Buffer.from(content, "utf8");
+  const extension = originalName.split(".").pop()?.toLowerCase();
+
+  return {
+    originalName,
+    mimeType: extension === "csv" ? "text/csv" : "text/plain",
+    sizeBytes: buffer.byteLength,
+    buffer
   };
 }
 
