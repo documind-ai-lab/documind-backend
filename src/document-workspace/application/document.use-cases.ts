@@ -9,6 +9,7 @@ import { DocumentFileInput, DocumentFilePolicy } from "./document-file-policy";
 import { DocumentRepository } from "./document.repository";
 import { DocumentSecurityScanner } from "./document-security-scanner";
 import { DocumentStorage } from "./document-storage";
+import { DocumentTextExtractionError, DocumentTextExtractor } from "./document-text-extractor";
 import { DocumentTextRepository } from "./document-text.repository";
 import { OrphanDocumentStorage } from "./orphan-document-storage";
 import { ProjectAccessChecker } from "./project-access-checker";
@@ -46,9 +47,16 @@ export type FailTextExtractionCommand = GetDocumentCommand & {
   reason: string;
 };
 
+export type ProcessPlainTextExtractionCommand = GetDocumentCommand;
+
 export type RetryDocumentResult =
   | { type: "success"; document: DocumentSnapshot }
   | { type: "conflict"; document: DocumentSnapshot; reason: string };
+
+export type ProcessPlainTextExtractionResult =
+  | { type: "completed"; document: DocumentSnapshot }
+  | { type: "failed"; document: DocumentSnapshot; reason: string }
+  | { type: "skipped"; document: DocumentSnapshot; reason: string };
 
 export type CleanupOrphanDocumentsOptions = {
   batchSize: number;
@@ -287,6 +295,51 @@ export class FailTextExtractionUseCase {
   }
 }
 
+export class ProcessPlainTextExtractionUseCase {
+  constructor(
+    private readonly getDocumentUseCase: GetDocumentUseCase,
+    private readonly startUseCase: StartTextExtractionUseCase,
+    private readonly completeUseCase: CompleteTextExtractionUseCase,
+    private readonly failUseCase: FailTextExtractionUseCase,
+    private readonly storage: DocumentStorage,
+    private readonly extractor: DocumentTextExtractor
+  ) {}
+
+  async execute(command: ProcessPlainTextExtractionCommand): Promise<ProcessPlainTextExtractionResult> {
+    const document = await this.getDocumentUseCase.execute(command);
+
+    if (!this.extractor.supports(document.extension)) {
+      return {
+        type: "skipped",
+        document,
+        reason: "지원하지 않는 텍스트 추출 형식입니다."
+      };
+    }
+
+    const extractingDocument = await this.startUseCase.execute(command);
+
+    try {
+      const content = await this.storage.read(extractingDocument.storageKey);
+      const extracted = this.extractor.extract({
+        extension: extractingDocument.extension,
+        content
+      });
+      const completedDocument = await this.completeUseCase.execute({
+        ...command,
+        content: extracted.content,
+        tokenCount: extracted.tokenCount ?? undefined
+      });
+
+      return { type: "completed", document: completedDocument };
+    } catch (error) {
+      const reason = plainTextExtractionFailureReason(error);
+      const failedDocument = await this.failUseCase.execute({ ...command, reason });
+
+      return { type: "failed", document: failedDocument, reason };
+    }
+  }
+}
+
 export class CleanupOrphanDocumentsUseCase {
   constructor(
     private readonly storage: DocumentStorage,
@@ -370,6 +423,14 @@ function normalizeTokenCount(tokenCount: number | undefined): number | null {
   }
 
   return tokenCount;
+}
+
+function plainTextExtractionFailureReason(error: unknown): string {
+  if (error instanceof DocumentTextValidationError || error instanceof DocumentTextExtractionError) {
+    return error.message;
+  }
+
+  return "원본 파일을 읽을 수 없습니다.";
 }
 
 function hashContent(content: string): string {

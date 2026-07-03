@@ -23,4 +23,14 @@ export class FakeDocumentStorage implements DocumentStorage {
 
     this.files.delete(storageKey);
   }
+
+  async read(storageKey: string): Promise<Buffer> {
+    const content = this.files.get(storageKey);
+
+    if (content === undefined) {
+      throw new Error("file not found");
+    }
+
+    return Buffer.from(content);
+  }
 }

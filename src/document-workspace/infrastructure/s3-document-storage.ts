@@ -1,5 +1,6 @@
 import {
   DeleteObjectCommand,
+  GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client
@@ -53,6 +54,22 @@ export class S3DocumentStorage implements DocumentStorage {
         Key: storageKey
       })
     );
+  }
+
+  async read(storageKey: string): Promise<Buffer> {
+    const result = await this.client.send(
+      new GetObjectCommand({
+        Bucket: this.options.bucket,
+        Key: storageKey
+      })
+    );
+    const body = (result as { Body?: { transformToByteArray?: () => Promise<Uint8Array> } }).Body;
+
+    if (body?.transformToByteArray === undefined) {
+      throw new Error("S3 object body를 읽을 수 없습니다.");
+    }
+
+    return Buffer.from(await body.transformToByteArray());
   }
 }
 

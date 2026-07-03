@@ -23,6 +23,7 @@ describe("LocalDocumentStorage", () => {
     await storage.put(storageKey, Buffer.from("%PDF-1.7"));
 
     await expect(readFile(join(basePath, storageKey), "utf8")).resolves.toBe("%PDF-1.7");
+    await expect(storage.read(storageKey)).resolves.toEqual(Buffer.from("%PDF-1.7"));
     await expect(storage.exists(storageKey)).resolves.toBe(true);
 
     await storage.remove(storageKey);

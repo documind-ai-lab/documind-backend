@@ -49,7 +49,7 @@
 - Modify: `test/local-document-storage.spec.ts`
 - Modify: `test/s3-document-storage.spec.ts`
 
-- [ ] **Step 1: local storage read 실패 테스트 작성**
+- [x] **Step 1: local storage read 실패 테스트 작성**
 
 `test/local-document-storage.spec.ts`의 첫 테스트에 저장 후 `storage.read(storageKey)` 검증을 추가한다.
 
@@ -57,7 +57,7 @@
 await expect(storage.read(storageKey)).resolves.toEqual(Buffer.from("%PDF-1.7"));
 ```
 
-- [ ] **Step 2: S3 read 실패 테스트 작성**
+- [x] **Step 2: S3 read 실패 테스트 작성**
 
 `test/s3-document-storage.spec.ts`에 `GetObjectCommand` import와 read 테스트를 추가한다.
 
@@ -94,13 +94,13 @@ it("read는 GetObjectCommand로 object body를 Buffer로 반환한다", async ()
 });
 ```
 
-- [ ] **Step 3: read 테스트 RED 확인**
+- [x] **Step 3: read 테스트 RED 확인**
 
 Run: `npm test -- local-document-storage.spec.ts s3-document-storage.spec.ts`
 
 Expected: FAIL because `DocumentStorage` interface and S3 adapter do not expose `read`.
 
-- [ ] **Step 4: DocumentStorage port에 read 추가**
+- [x] **Step 4: DocumentStorage port에 read 추가**
 
 `src/document-workspace/application/document-storage.ts`를 다음처럼 수정한다.
 
@@ -115,7 +115,7 @@ export interface DocumentStorage {
 }
 ```
 
-- [ ] **Step 5: S3DocumentStorage read 구현**
+- [x] **Step 5: S3DocumentStorage read 구현**
 
 `src/document-workspace/infrastructure/s3-document-storage.ts`에 `GetObjectCommand`를 추가하고 `read`를 구현한다.
 
@@ -147,7 +147,7 @@ async read(storageKey: string): Promise<Buffer> {
 }
 ```
 
-- [ ] **Step 6: FakeDocumentStorage read 구현**
+- [x] **Step 6: FakeDocumentStorage read 구현**
 
 `src/document-workspace/testing/fake-document-storage.ts`에 다음 메서드를 추가한다.
 
@@ -163,7 +163,7 @@ async read(storageKey: string): Promise<Buffer> {
 }
 ```
 
-- [ ] **Step 7: storage read 테스트 GREEN 확인**
+- [x] **Step 7: storage read 테스트 GREEN 확인**
 
 Run: `npm test -- local-document-storage.spec.ts s3-document-storage.spec.ts`
 
@@ -176,7 +176,7 @@ Expected: PASS.
 - Create: `src/document-workspace/infrastructure/plain-text-document-text-extractor.ts`
 - Create: `test/plain-text-document-text-extractor.spec.ts`
 
-- [ ] **Step 1: extractor 실패 테스트 작성**
+- [x] **Step 1: extractor 실패 테스트 작성**
 
 `test/plain-text-document-text-extractor.spec.ts`를 생성한다.
 
@@ -246,13 +246,13 @@ describe("PlainTextDocumentTextExtractor", () => {
 });
 ```
 
-- [ ] **Step 2: extractor 테스트 RED 확인**
+- [x] **Step 2: extractor 테스트 RED 확인**
 
 Run: `npm test -- plain-text-document-text-extractor.spec.ts`
 
 Expected: FAIL because extractor files do not exist.
 
-- [ ] **Step 3: extractor port 추가**
+- [x] **Step 3: extractor port 추가**
 
 `src/document-workspace/application/document-text-extractor.ts`를 생성한다.
 
@@ -287,7 +287,7 @@ export class DocumentTextExtractionError extends Error {
 }
 ```
 
-- [ ] **Step 4: PlainTextDocumentTextExtractor 구현**
+- [x] **Step 4: PlainTextDocumentTextExtractor 구현**
 
 `src/document-workspace/infrastructure/plain-text-document-text-extractor.ts`를 생성한다.
 
@@ -340,7 +340,7 @@ function stripUtf8Bom(content: string): string {
 }
 ```
 
-- [ ] **Step 5: extractor 테스트 GREEN 확인**
+- [x] **Step 5: extractor 테스트 GREEN 확인**
 
 Run: `npm test -- plain-text-document-text-extractor.spec.ts`
 
@@ -352,7 +352,7 @@ Expected: PASS.
 - Modify: `src/document-workspace/application/document.use-cases.ts`
 - Modify: `test/document-use-cases.spec.ts`
 
-- [ ] **Step 1: 처리 use case 실패 테스트 작성**
+- [x] **Step 1: 처리 use case 실패 테스트 작성**
 
 `test/document-use-cases.spec.ts` import에 extractor와 use case를 추가한다.
 
@@ -459,13 +459,13 @@ function createProcessPlainTextExtractionUseCase(): ProcessPlainTextExtractionUs
 }
 ```
 
-- [ ] **Step 2: 처리 use case 테스트 RED 확인**
+- [x] **Step 2: 처리 use case 테스트 RED 확인**
 
 Run: `npm test -- document-use-cases.spec.ts -t "plain text 추출"`
 
 Expected: FAIL because `ProcessPlainTextExtractionUseCase` does not exist.
 
-- [ ] **Step 3: ProcessPlainTextExtractionUseCase 구현**
+- [x] **Step 3: ProcessPlainTextExtractionUseCase 구현**
 
 `src/document-workspace/application/document.use-cases.ts`에 import를 추가한다.
 
@@ -550,7 +550,7 @@ function toPlainTextExtractionFailureReason(error: unknown): string {
 }
 ```
 
-- [ ] **Step 4: 처리 use case 테스트 GREEN 확인**
+- [x] **Step 4: 처리 use case 테스트 GREEN 확인**
 
 Run: `npm test -- document-use-cases.spec.ts -t "plain text 추출"`
 
@@ -562,7 +562,7 @@ Expected: PASS.
 - Modify: `src/document-workspace/document-workspace.module.ts`
 - Modify: `test/document-api.e2e-spec.ts`
 
-- [ ] **Step 1: provider wiring 추가**
+- [x] **Step 1: provider wiring 추가**
 
 `src/document-workspace/document-workspace.module.ts`에 extractor import를 추가한다.
 
@@ -610,7 +610,7 @@ providers에 extractor와 process use case를 등록한다.
 }
 ```
 
-- [ ] **Step 2: e2e module override 추가**
+- [x] **Step 2: e2e module override 추가**
 
 `test/document-api.e2e-spec.ts`에 import를 추가한다.
 
@@ -626,7 +626,7 @@ testing module builder에 override를 추가한다.
 .useValue(new PlainTextDocumentTextExtractor())
 ```
 
-- [ ] **Step 3: e2e module compile 확인**
+- [x] **Step 3: e2e module compile 확인**
 
 Run: `npm run test:e2e`
 
@@ -637,43 +637,43 @@ Expected: PASS.
 **Files:**
 - All changed files
 
-- [ ] **Step 1: forbidden-term scan**
+- [x] **Step 1: forbidden-term scan**
 
 Run: `rg -n "T[B]D|T[O]DO|placehol[d]er|fill i[n]|나중[에]|적[절]|미[정]|CHANGE_M[E]|docs/superpower[s]" docs/specs/txt-csv-text-extractor-design.md docs/specs/txt-csv-text-extractor-implementation-plan.md src test`
 
 Expected: no matches.
 
-- [ ] **Step 2: typecheck**
+- [x] **Step 2: typecheck**
 
 Run: `npm run typecheck`
 
 Expected: PASS.
 
-- [ ] **Step 3: lint**
+- [x] **Step 3: lint**
 
 Run: `npm run lint`
 
 Expected: PASS.
 
-- [ ] **Step 4: unit tests**
+- [x] **Step 4: unit tests**
 
 Run: `npm test`
 
 Expected: PASS.
 
-- [ ] **Step 5: e2e tests**
+- [x] **Step 5: e2e tests**
 
 Run: `npm run test:e2e`
 
 Expected: PASS.
 
-- [ ] **Step 6: build**
+- [x] **Step 6: build**
 
 Run: `npm run build`
 
 Expected: PASS.
 
-- [ ] **Step 7: diff check**
+- [x] **Step 7: diff check**
 
 Run: `git diff --check`
 
