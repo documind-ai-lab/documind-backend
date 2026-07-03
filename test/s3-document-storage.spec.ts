@@ -60,6 +60,14 @@ describe("S3DocumentStorage", () => {
     });
   });
 
+  it("exists는 비객체 오류도 TypeError로 바꾸지 않고 그대로 전파한다", async () => {
+    const client = createS3Client();
+    client.send.mockRejectedValueOnce(null);
+    const storage = new S3DocumentStorage(client, { bucket: "documind-documents" });
+
+    await expect(storage.exists("projects/p1/documents/d1/d1.pdf")).rejects.toBeNull();
+  });
+
   it("remove는 DeleteObjectCommand로 object 삭제를 요청한다", async () => {
     const client = createS3Client();
     const storage = new S3DocumentStorage(client, { bucket: "documind-documents" });

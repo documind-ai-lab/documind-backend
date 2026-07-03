@@ -57,6 +57,10 @@ export class S3DocumentStorage implements DocumentStorage {
 }
 
 function isNotFoundError(error: unknown): boolean {
+  if (error === null || typeof error !== "object") {
+    return false;
+  }
+
   const candidate = error as { name?: string; $metadata?: { httpStatusCode?: number } };
   return (
     candidate.name === "NotFound" ||
