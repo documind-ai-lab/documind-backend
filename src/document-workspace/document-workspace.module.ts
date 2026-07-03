@@ -9,6 +9,7 @@ import { ID_GENERATOR, IdGenerator, UuidV7Generator } from "../shared/applicatio
 import { loadEnv } from "../shared/infrastructure/env";
 import { NestApplicationLogger } from "../shared/infrastructure/nest-application-logger";
 import { DOCUMENT_STORAGE, DocumentStorage } from "./application/document-storage";
+import { DOCUMENT_TEXT_REPOSITORY, DocumentTextRepository } from "./application/document-text.repository";
 import { DocumentFilePolicy } from "./application/document-file-policy";
 import { ORPHAN_DOCUMENT_STORAGE, OrphanDocumentStorage } from "./application/orphan-document-storage";
 import {
@@ -23,9 +24,12 @@ import { DOCUMENT_REPOSITORY, DocumentRepository } from "./application/document.
 import { PROJECT_ACCESS_CHECKER, ProjectAccessChecker } from "./application/project-access-checker";
 import {
   CleanupOrphanDocumentsUseCase,
+  CompleteTextExtractionUseCase,
+  FailTextExtractionUseCase,
   GetDocumentUseCase,
   ListDocumentsUseCase,
   RetryDocumentUseCase,
+  StartTextExtractionUseCase,
   UploadDocumentUseCase
 } from "./application/document.use-cases";
 import { DocumentController } from "./interface/document.controller";
@@ -33,6 +37,7 @@ import { LocalDocumentStorage } from "./infrastructure/local-document-storage";
 import { NoopDocumentSecurityScanner } from "./infrastructure/noop-document-security-scanner";
 import { OrphanDocumentCleanupScheduler } from "./infrastructure/orphan-document-cleanup-scheduler";
 import { PrismaDocumentRepository } from "./infrastructure/prisma-document.repository";
+import { PrismaDocumentTextRepository } from "./infrastructure/prisma-document-text.repository";
 import { PrismaOrphanDocumentStorage } from "./infrastructure/prisma-orphan-document-storage";
 import { PrismaProjectAccessChecker } from "./infrastructure/prisma-project-access-checker";
 import { S3DocumentStorage } from "./infrastructure/s3-document-storage";
@@ -45,6 +50,7 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
     { provide: ID_GENERATOR, useClass: UuidV7Generator },
     { provide: APPLICATION_LOGGER, useClass: NestApplicationLogger },
     { provide: DOCUMENT_REPOSITORY, useClass: PrismaDocumentRepository },
+    { provide: DOCUMENT_TEXT_REPOSITORY, useClass: PrismaDocumentTextRepository },
     {
       provide: DOCUMENT_STORAGE,
       useFactory: () => {
@@ -144,6 +150,42 @@ import { PrismaProjectDocumentSummaryUpdater } from "../project-workspace/infras
         clock: Clock
       ) => new RetryDocumentUseCase(repository, storage, accessChecker, clock),
       inject: [DOCUMENT_REPOSITORY, DOCUMENT_STORAGE, PROJECT_ACCESS_CHECKER, CLOCK]
+    },
+    {
+      provide: StartTextExtractionUseCase,
+      useFactory: (
+        repository: DocumentRepository,
+        accessChecker: ProjectAccessChecker,
+        clock: Clock
+      ) => new StartTextExtractionUseCase(repository, accessChecker, clock),
+      inject: [DOCUMENT_REPOSITORY, PROJECT_ACCESS_CHECKER, CLOCK]
+    },
+    {
+      provide: CompleteTextExtractionUseCase,
+      useFactory: (
+        repository: DocumentRepository,
+        documentTextRepository: DocumentTextRepository,
+        accessChecker: ProjectAccessChecker,
+        clock: Clock,
+        idGenerator: IdGenerator
+      ) =>
+        new CompleteTextExtractionUseCase(
+          repository,
+          documentTextRepository,
+          accessChecker,
+          clock,
+          idGenerator
+        ),
+      inject: [DOCUMENT_REPOSITORY, DOCUMENT_TEXT_REPOSITORY, PROJECT_ACCESS_CHECKER, CLOCK, ID_GENERATOR]
+    },
+    {
+      provide: FailTextExtractionUseCase,
+      useFactory: (
+        repository: DocumentRepository,
+        accessChecker: ProjectAccessChecker,
+        clock: Clock
+      ) => new FailTextExtractionUseCase(repository, accessChecker, clock),
+      inject: [DOCUMENT_REPOSITORY, PROJECT_ACCESS_CHECKER, CLOCK]
     },
     {
       provide: CleanupOrphanDocumentsUseCase,

@@ -12,6 +12,7 @@ import {
   DocumentSecurityScanner
 } from "../src/document-workspace/application/document-security-scanner";
 import { DOCUMENT_STORAGE } from "../src/document-workspace/application/document-storage";
+import { DOCUMENT_TEXT_REPOSITORY } from "../src/document-workspace/application/document-text.repository";
 import { ORPHAN_DOCUMENT_STORAGE } from "../src/document-workspace/application/orphan-document-storage";
 import { PROJECT_ACCESS_CHECKER } from "../src/document-workspace/application/project-access-checker";
 import { PROJECT_DOCUMENT_SUMMARY_UPDATER } from "../src/document-workspace/application/project-document-summary-updater";
@@ -19,6 +20,7 @@ import { DocumentStatus } from "../src/document-workspace/domain/document-status
 import { DocumentSecurityScanUnavailableError } from "../src/document-workspace/domain/document.errors";
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
 import { InMemoryDocumentRepository } from "../src/document-workspace/testing/in-memory-document.repository";
+import { InMemoryDocumentTextRepository } from "../src/document-workspace/testing/in-memory-document-text.repository";
 import { ProjectNotFoundError, ProjectStateConflictError } from "../src/project-workspace/domain/project.errors";
 import { HttpExceptionFilter } from "../src/shared/interface/http-exception.filter";
 
@@ -58,6 +60,8 @@ describe("Document API", () => {
     })
       .overrideProvider(DOCUMENT_REPOSITORY)
       .useValue(repository)
+      .overrideProvider(DOCUMENT_TEXT_REPOSITORY)
+      .useValue(new InMemoryDocumentTextRepository())
       .overrideProvider(DOCUMENT_STORAGE)
       .useValue(storage)
       .overrideProvider(DOCUMENT_SECURITY_SCANNER)

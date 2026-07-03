@@ -100,6 +100,48 @@ export class Document {
     };
   }
 
+  markTextExtracting(now: Date): void {
+    if (this.state.status !== DocumentStatus.TEXT_EXTRACTION_PENDING) {
+      throw new DocumentStateConflictError("텍스트 추출 대기 상태의 문서만 추출을 시작할 수 있습니다.");
+    }
+
+    this.state = {
+      ...this.state,
+      status: DocumentStatus.TEXT_EXTRACTING,
+      failureReason: null,
+      updatedAt: now
+    };
+  }
+
+  markTextExtractionReady(now: Date): void {
+    if (this.state.status !== DocumentStatus.TEXT_EXTRACTING) {
+      throw new DocumentStateConflictError("텍스트 추출 중 상태의 문서만 준비 상태로 전환할 수 있습니다.");
+    }
+
+    this.state = {
+      ...this.state,
+      status: DocumentStatus.READY,
+      failureReason: null,
+      updatedAt: now
+    };
+  }
+
+  markTextExtractionFailed(reason: string, now: Date): void {
+    if (
+      this.state.status !== DocumentStatus.TEXT_EXTRACTION_PENDING &&
+      this.state.status !== DocumentStatus.TEXT_EXTRACTING
+    ) {
+      throw new DocumentStateConflictError("텍스트 추출 대기 또는 추출 중 상태의 문서만 실패 처리할 수 있습니다.");
+    }
+
+    this.state = {
+      ...this.state,
+      status: DocumentStatus.FAILED,
+      failureReason: normalizeFailureReason(reason),
+      updatedAt: now
+    };
+  }
+
   markFailed(reason: string, now: Date): void {
     this.state = {
       ...this.state,

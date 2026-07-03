@@ -38,3 +38,9 @@ export class DocumentFileValidationError extends DomainError {
     super("VALIDATION_ERROR", message, status);
   }
 }
+
+export class DocumentTextValidationError extends DomainError {
+  constructor(message: string) {
+    super("VALIDATION_ERROR", message, 422);
+  }
+}

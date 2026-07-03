@@ -4,10 +4,14 @@ import {
   DocumentSecurityScanResult,
   DocumentSecurityScanner
 } from "../src/document-workspace/application/document-security-scanner";
+import { DocumentTextValidationError } from "../src/document-workspace/domain/document.errors";
 import {
+  CompleteTextExtractionUseCase,
   GetDocumentUseCase,
+  FailTextExtractionUseCase,
   ListDocumentsUseCase,
   RetryDocumentUseCase,
+  StartTextExtractionUseCase,
   CleanupOrphanDocumentsUseCase,
   UploadDocumentUseCase
 } from "../src/document-workspace/application/document.use-cases";
@@ -20,6 +24,7 @@ import {
 } from "../src/document-workspace/domain/document.errors";
 import { FakeDocumentStorage } from "../src/document-workspace/testing/fake-document-storage";
 import { InMemoryDocumentRepository } from "../src/document-workspace/testing/in-memory-document.repository";
+import { InMemoryDocumentTextRepository } from "../src/document-workspace/testing/in-memory-document-text.repository";
 import { Clock } from "../src/shared/application/clock";
 import { IdGenerator } from "../src/shared/application/id-generator";
 
@@ -130,6 +135,7 @@ describe("Document use cases", () => {
   const ownerId = "018ff4f0-0000-7000-8000-000000000002";
 
   let repository: InMemoryDocumentRepository;
+  let documentTextRepository: InMemoryDocumentTextRepository;
   let storage: FakeDocumentStorage;
   let orphanStorage: FakeOrphanDocumentStorage;
   let accessChecker: FakeProjectAccessChecker;
@@ -141,6 +147,7 @@ describe("Document use cases", () => {
 
   beforeEach(() => {
     repository = new InMemoryDocumentRepository();
+    documentTextRepository = new InMemoryDocumentTextRepository(repository);
     storage = new FakeDocumentStorage();
     orphanStorage = new FakeOrphanDocumentStorage();
     accessChecker = new FakeProjectAccessChecker();
@@ -389,6 +396,122 @@ describe("Document use cases", () => {
       status: DocumentStatus.TEXT_EXTRACTION_PENDING,
       failureReason: null
     });
+  });
+
+  it("텍스트 추출 시작 use case는 쓰기 권한 확인 후 문서를 추출 중 상태로 저장한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const startUseCase = new StartTextExtractionUseCase(repository, accessChecker, new FixedClock(now));
+
+    const result = await startUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+
+    expect(result.status).toBe(DocumentStatus.TEXT_EXTRACTING);
+    expect(saved!.snapshot().status).toBe(DocumentStatus.TEXT_EXTRACTING);
+    expect(accessChecker.writableRequests).toContainEqual({ projectId, ownerId });
+  });
+
+  it("텍스트 추출 성공 use case는 텍스트를 저장하고 문서를 준비 상태로 전환한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const startUseCase = new StartTextExtractionUseCase(repository, accessChecker, new FixedClock(now));
+    await startUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const completedAt = new Date("2026-07-02T02:00:00.000Z");
+    const completeUseCase = new CompleteTextExtractionUseCase(
+      repository,
+      documentTextRepository,
+      accessChecker,
+      new FixedClock(completedAt),
+      new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000201"])
+    );
+
+    const result = await completeUseCase.execute({
+      projectId,
+      ownerId,
+      documentId: document.id,
+      content: "  첫 줄\n둘째 줄  ",
+      tokenCount: 12
+    });
+    const text = await documentTextRepository.findByDocumentId(document.id);
+
+    expect(result).toMatchObject({
+      status: DocumentStatus.READY,
+      failureReason: null,
+      updatedAt: completedAt
+    });
+    expect(text).toMatchObject({
+      id: "018ff4f0-0000-7000-8000-000000000201",
+      documentId: document.id,
+      projectId,
+      ownerId,
+      content: "첫 줄\n둘째 줄",
+      contentHash: "5fa3a5849b103ab0cf53249fd7152ff68e3f9b039da1038b0211f28de331eee0",
+      tokenCount: 12,
+      extractedAt: completedAt,
+      createdAt: completedAt,
+      updatedAt: completedAt
+    });
+  });
+
+  it("텍스트 추출 성공 use case는 빈 추출 결과를 검증 오류로 거부한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const startUseCase = new StartTextExtractionUseCase(repository, accessChecker, new FixedClock(now));
+    await startUseCase.execute({ projectId, ownerId, documentId: document.id });
+    const completeUseCase = new CompleteTextExtractionUseCase(
+      repository,
+      documentTextRepository,
+      accessChecker,
+      new FixedClock(now),
+      new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000201"])
+    );
+
+    await expect(
+      completeUseCase.execute({
+        projectId,
+        ownerId,
+        documentId: document.id,
+        content: "   \n\t   "
+      })
+    ).rejects.toThrow(DocumentTextValidationError);
+
+    const saved = await repository.findByProjectAndId(projectId, document.id);
+    expect(saved!.snapshot().status).toBe(DocumentStatus.TEXT_EXTRACTING);
+    await expect(documentTextRepository.findByDocumentId(document.id)).resolves.toBeNull();
+  });
+
+  it("텍스트 추출 실패 use case는 문서를 실패 상태와 실패 사유로 저장한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const failUseCase = new FailTextExtractionUseCase(repository, accessChecker, new FixedClock(now));
+
+    const result = await failUseCase.execute({
+      projectId,
+      ownerId,
+      documentId: document.id,
+      reason: "  파서 오류  "
+    });
+
+    expect(result).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "파서 오류"
+    });
+  });
+
+  it("텍스트 추출 use case는 잘못된 상태 전환을 상태 충돌로 거부한다", async () => {
+    const document = await uploadUseCase.execute({ projectId, ownerId, file: pdfFile() });
+    const completeUseCase = new CompleteTextExtractionUseCase(
+      repository,
+      documentTextRepository,
+      accessChecker,
+      new FixedClock(now),
+      new FixedIdGenerator(["018ff4f0-0000-7000-8000-000000000201"])
+    );
+
+    await expect(
+      completeUseCase.execute({
+        projectId,
+        ownerId,
+        documentId: document.id,
+        content: "추출 결과"
+      })
+    ).rejects.toThrow(DocumentStateConflictError);
   });
 
   it("고아 파일 정리 대상 파일 삭제가 성공하면 후보를 resolved 처리한다", async () => {

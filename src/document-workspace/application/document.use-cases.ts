@@ -1,16 +1,20 @@
+import { createHash } from "crypto";
 import { Clock } from "../../shared/application/clock";
 import { IdGenerator } from "../../shared/application/id-generator";
 import { ApplicationLogger } from "../../shared/application/application-logger";
 import { PageResponse } from "../../shared/application/page-response";
 import { CreateDocumentInput, Document, DocumentSnapshot } from "../domain/document";
-import { DocumentNotFoundError } from "../domain/document.errors";
+import { DocumentNotFoundError, DocumentTextValidationError } from "../domain/document.errors";
 import { DocumentFileInput, DocumentFilePolicy } from "./document-file-policy";
 import { DocumentRepository } from "./document.repository";
 import { DocumentSecurityScanner } from "./document-security-scanner";
 import { DocumentStorage } from "./document-storage";
+import { DocumentTextRepository } from "./document-text.repository";
 import { OrphanDocumentStorage } from "./orphan-document-storage";
 import { ProjectAccessChecker } from "./project-access-checker";
 import { ProjectDocumentSummaryUpdater } from "./project-document-summary-updater";
+
+const MAX_DOCUMENT_TEXT_BYTES = 5 * 1024 * 1024;
 
 export type UploadDocumentCommand = {
   projectId: string;
@@ -32,6 +36,15 @@ export type GetDocumentCommand = {
 };
 
 export type RetryDocumentCommand = GetDocumentCommand;
+
+export type CompleteTextExtractionCommand = GetDocumentCommand & {
+  content: string;
+  tokenCount?: number;
+};
+
+export type FailTextExtractionCommand = GetDocumentCommand & {
+  reason: string;
+};
 
 export type RetryDocumentResult =
   | { type: "success"; document: DocumentSnapshot }
@@ -198,6 +211,82 @@ export class RetryDocumentUseCase {
   }
 }
 
+export class StartTextExtractionUseCase {
+  constructor(
+    private readonly repository: DocumentRepository,
+    private readonly accessChecker: ProjectAccessChecker,
+    private readonly clock: Clock
+  ) {}
+
+  async execute(command: GetDocumentCommand): Promise<DocumentSnapshot> {
+    await this.accessChecker.ensureWritableProject(command.projectId, command.ownerId);
+    const document = await findDocumentOrThrow(
+      this.repository,
+      command.projectId,
+      command.documentId
+    );
+    document.markTextExtracting(this.clock.now());
+    await this.repository.save(document);
+    return document.snapshot();
+  }
+}
+
+export class CompleteTextExtractionUseCase {
+  constructor(
+    private readonly repository: DocumentRepository,
+    private readonly documentTextRepository: DocumentTextRepository,
+    private readonly accessChecker: ProjectAccessChecker,
+    private readonly clock: Clock,
+    private readonly idGenerator: IdGenerator
+  ) {}
+
+  async execute(command: CompleteTextExtractionCommand): Promise<DocumentSnapshot> {
+    await this.accessChecker.ensureWritableProject(command.projectId, command.ownerId);
+    const document = await findDocumentOrThrow(
+      this.repository,
+      command.projectId,
+      command.documentId
+    );
+    const content = normalizeDocumentTextContent(command.content);
+    const tokenCount = normalizeTokenCount(command.tokenCount);
+    const now = this.clock.now();
+
+    document.markTextExtractionReady(now);
+    await this.documentTextRepository.saveExtractionResult(document, {
+      id: this.idGenerator.nextId(),
+      documentId: command.documentId,
+      projectId: command.projectId,
+      ownerId: command.ownerId,
+      content,
+      contentHash: hashContent(content),
+      tokenCount,
+      extractedAt: now,
+      now
+    });
+    return document.snapshot();
+  }
+}
+
+export class FailTextExtractionUseCase {
+  constructor(
+    private readonly repository: DocumentRepository,
+    private readonly accessChecker: ProjectAccessChecker,
+    private readonly clock: Clock
+  ) {}
+
+  async execute(command: FailTextExtractionCommand): Promise<DocumentSnapshot> {
+    await this.accessChecker.ensureWritableProject(command.projectId, command.ownerId);
+    const document = await findDocumentOrThrow(
+      this.repository,
+      command.projectId,
+      command.documentId
+    );
+    document.markTextExtractionFailed(command.reason, this.clock.now());
+    await this.repository.save(document);
+    return document.snapshot();
+  }
+}
+
 export class CleanupOrphanDocumentsUseCase {
   constructor(
     private readonly storage: DocumentStorage,
@@ -255,4 +344,34 @@ async function findDocumentOrThrow(
 
 function buildStorageKey(projectId: string, documentId: string, extension: string): string {
   return `projects/${projectId}/documents/${documentId}/${documentId}.${extension}`;
+}
+
+function normalizeDocumentTextContent(content: string): string {
+  const normalized = content.trim();
+
+  if (normalized.length === 0) {
+    throw new DocumentTextValidationError("추출 텍스트가 비어 있습니다.");
+  }
+
+  if (Buffer.byteLength(normalized, "utf8") > MAX_DOCUMENT_TEXT_BYTES) {
+    throw new DocumentTextValidationError("추출 텍스트가 최대 저장 크기를 초과했습니다.");
+  }
+
+  return normalized;
+}
+
+function normalizeTokenCount(tokenCount: number | undefined): number | null {
+  if (tokenCount === undefined) {
+    return null;
+  }
+
+  if (!Number.isInteger(tokenCount) || tokenCount < 0) {
+    throw new DocumentTextValidationError("tokenCount는 0 이상의 정수여야 합니다.");
+  }
+
+  return tokenCount;
+}
+
+function hashContent(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
 }

@@ -92,6 +92,67 @@ describe("Document domain", () => {
     );
   });
 
+  it("텍스트 추출 대기 문서는 추출 중 상태로 전환한다", () => {
+    const document = pendingDocument();
+    const startedAt = new Date("2026-07-01T02:00:00.000Z");
+
+    document.markTextExtracting(startedAt);
+
+    expect(document.snapshot()).toMatchObject({
+      status: DocumentStatus.TEXT_EXTRACTING,
+      failureReason: null,
+      updatedAt: startedAt
+    });
+  });
+
+  it("텍스트 추출 중 문서는 준비 상태로 전환하고 실패 사유를 비운다", () => {
+    const document = extractingDocument();
+    const readyAt = new Date("2026-07-01T02:30:00.000Z");
+
+    document.markTextExtractionReady(readyAt);
+
+    expect(document.snapshot()).toMatchObject({
+      status: DocumentStatus.READY,
+      failureReason: null,
+      updatedAt: readyAt
+    });
+  });
+
+  it("텍스트 추출 대기 또는 추출 중 문서는 추출 실패 상태로 전환한다", () => {
+    const pending = pendingDocument();
+    const extracting = extractingDocument();
+    const failedAt = new Date("2026-07-01T03:00:00.000Z");
+
+    pending.markTextExtractionFailed("빈 텍스트입니다.", failedAt);
+    extracting.markTextExtractionFailed("파서 오류", failedAt);
+
+    expect(pending.snapshot()).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "빈 텍스트입니다.",
+      updatedAt: failedAt
+    });
+    expect(extracting.snapshot()).toMatchObject({
+      status: DocumentStatus.FAILED,
+      failureReason: "파서 오류",
+      updatedAt: failedAt
+    });
+  });
+
+  it("허용되지 않는 텍스트 추출 상태 전환은 상태 충돌 오류를 던진다", () => {
+    const failed = failedDocument();
+    const ready = readyDocument();
+
+    expect(() => failed.markTextExtracting(new Date("2026-07-01T02:00:00.000Z"))).toThrow(
+      DocumentStateConflictError
+    );
+    expect(() => ready.markTextExtractionReady(new Date("2026-07-01T02:00:00.000Z"))).toThrow(
+      DocumentStateConflictError
+    );
+    expect(() => ready.markTextExtractionFailed("재처리 실패", new Date("2026-07-01T02:00:00.000Z"))).toThrow(
+      DocumentStateConflictError
+    );
+  });
+
   it("문서를 실패 상태로 표시하면 실패 사유와 updatedAt을 갱신한다", () => {
     const document = pendingDocument();
     const failedAt = new Date("2026-07-01T02:00:00.000Z");
@@ -123,6 +184,18 @@ describe("Document domain", () => {
   function failedDocument(): Document {
     const document = pendingDocument();
     document.markFailed("텍스트 추출 실패", new Date("2026-07-01T01:30:00.000Z"));
+    return document;
+  }
+
+  function extractingDocument(): Document {
+    const document = pendingDocument();
+    document.markTextExtracting(new Date("2026-07-01T01:30:00.000Z"));
+    return document;
+  }
+
+  function readyDocument(): Document {
+    const document = extractingDocument();
+    document.markTextExtractionReady(new Date("2026-07-01T01:45:00.000Z"));
     return document;
   }
 });
