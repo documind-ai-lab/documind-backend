@@ -16,7 +16,7 @@ TXT/CSV 실패 문서 retry API가 `ProcessPlainTextExtractionUseCase`를 호출
 
 - Modify: `test/document-api.e2e-spec.ts`
 
-- [ ] **Step 1: retry용 실패 문서 helper 추가**
+- [x] **Step 1: retry용 실패 문서 helper 추가**
 
 테스트에서 업로드 후 repository aggregate를 `FAILED`로 전환하는 중복을 줄이기 위해 helper를 추가한다.
 
@@ -24,7 +24,7 @@ TXT/CSV 실패 문서 retry API가 `ProcessPlainTextExtractionUseCase`를 호출
 async function markDocumentFailed(documentId: string, reason = "텍스트 추출 실패"): Promise<void>
 ```
 
-- [ ] **Step 2: TXT retry READY 테스트 추가**
+- [x] **Step 2: TXT retry READY 테스트 추가**
 
 TXT 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한다.
 
@@ -34,7 +34,7 @@ TXT 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한
 - 응답 `status`가 `READY`
 - `DocumentText` content가 TXT 원문 텍스트와 같다.
 
-- [ ] **Step 3: CSV retry READY 테스트 추가**
+- [x] **Step 3: CSV retry READY 테스트 추가**
 
 CSV 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한다.
 
@@ -43,7 +43,7 @@ CSV 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한
 - 응답 `status`가 `READY`
 - `DocumentText` content가 CSV 원문 텍스트와 같다.
 
-- [ ] **Step 4: PDF retry pending 유지 테스트 추가**
+- [x] **Step 4: PDF retry pending 유지 테스트 추가**
 
 PDF 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한다.
 
@@ -52,7 +52,7 @@ PDF 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한
 - 응답 `status`가 `TEXT_EXTRACTION_PENDING`
 - `DocumentText`가 저장되지 않는다.
 
-- [ ] **Step 5: 빈 TXT retry FAILED 테스트 추가**
+- [x] **Step 5: 빈 TXT retry FAILED 테스트 추가**
 
 빈 TXT 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한다.
 
@@ -61,11 +61,11 @@ PDF 문서를 업로드하고 실패 상태로 만든 뒤 retry API를 호출한
 - 응답 `status`가 `FAILED`
 - `failureReason`이 `추출 텍스트가 비어 있습니다.`
 
-- [ ] **Step 6: 원본 파일 없음 409 회귀 유지**
+- [x] **Step 6: 원본 파일 없음 409 회귀 유지**
 
 기존 원본 파일 없음 retry 테스트가 409를 유지하는지 확인한다.
 
-- [ ] **Step 7: e2e RED 확인**
+- [x] **Step 7: e2e RED 확인**
 
 Run:
 
@@ -83,7 +83,7 @@ Expected:
 
 - Modify: `src/document-workspace/interface/document.controller.ts`
 
-- [ ] **Step 1: retry 성공 후 plain text 처리 helper 호출**
+- [x] **Step 1: retry 성공 후 plain text 처리 helper 호출**
 
 `retry` method에서 conflict 처리 후 다음 흐름을 추가한다.
 
@@ -92,11 +92,11 @@ const processedDocument = await this.processUploadedPlainTextDocument(result.doc
 return presentDocument(processedDocument);
 ```
 
-- [ ] **Step 2: helper 이름 일반화**
+- [x] **Step 2: helper 이름 일반화**
 
 업로드와 retry가 같은 helper를 사용하므로 `processUploadedPlainTextDocument`를 `processPlainTextDocument`로 변경한다.
 
-- [ ] **Step 3: e2e GREEN 확인**
+- [x] **Step 3: e2e GREEN 확인**
 
 Run:
 
@@ -114,7 +114,7 @@ Expected:
 
 - All changed files
 
-- [ ] **Step 1: forbidden-term scan**
+- [x] **Step 1: forbidden-term scan**
 
 Run:
 
@@ -124,7 +124,7 @@ rg -n "T[B]D|T[O]DO|placehol[d]er|fill i[n]|나중[에]|적[절]|미[정]|CHANGE
 
 Expected: no matches.
 
-- [ ] **Step 2: diff check**
+- [x] **Step 2: diff check**
 
 Run:
 
@@ -134,7 +134,7 @@ git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 3: typecheck**
+- [x] **Step 3: typecheck**
 
 Run:
 
@@ -144,7 +144,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: lint**
+- [x] **Step 4: lint**
 
 Run:
 
@@ -154,7 +154,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 5: unit tests**
+- [x] **Step 5: unit tests**
 
 Run:
 
@@ -164,7 +164,7 @@ npm test
 
 Expected: PASS.
 
-- [ ] **Step 6: e2e tests**
+- [x] **Step 6: e2e tests**
 
 Run:
 
@@ -174,7 +174,7 @@ npm run test:e2e
 
 Expected: PASS.
 
-- [ ] **Step 7: build**
+- [x] **Step 7: build**
 
 Run:
 
