@@ -196,6 +196,122 @@ describe("Document API", () => {
     await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toBeNull();
   });
 
+  it("FAILED TXT 재시도 후 텍스트를 다시 추출하고 READY 응답을 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("초기 회의 내용"), {
+        filename: "meeting.txt",
+        contentType: "text/plain"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    const failedDocument = await markDocumentFailed(documentId);
+    await storage.put(failedDocument.storageKey, Buffer.from("재시도 회의 내용"));
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents/${documentId}/retry`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.CREATED)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: documentId,
+          status: DocumentStatus.READY,
+          failureReason: null
+        });
+      });
+
+    await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toMatchObject({
+      documentId,
+      content: "재시도 회의 내용"
+    });
+  });
+
+  it("FAILED CSV 재시도 후 원본 CSV 텍스트를 다시 저장하고 READY 응답을 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("품목,금액\n초기,1000"), {
+        filename: "estimate.csv",
+        contentType: "text/csv"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    const failedDocument = await markDocumentFailed(documentId);
+    await storage.put(failedDocument.storageKey, Buffer.from("품목,금액\n재시도,2000"));
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents/${documentId}/retry`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.CREATED)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: documentId,
+          status: DocumentStatus.READY,
+          failureReason: null
+        });
+      });
+
+    await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toMatchObject({
+      documentId,
+      content: "품목,금액\n재시도,2000"
+    });
+  });
+
+  it("plain text 미지원 파일 재시도는 기존 추출 대기 상태를 유지한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "proposal.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    await markDocumentFailed(documentId);
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents/${documentId}/retry`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.CREATED)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: documentId,
+          status: DocumentStatus.TEXT_EXTRACTION_PENDING,
+          failureReason: null
+        });
+      });
+
+    await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toBeNull();
+  });
+
+  it("빈 TXT 재시도 후 FAILED 응답과 실패 사유를 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("   "), {
+        filename: "empty.txt",
+        contentType: "text/plain"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    await markDocumentFailed(documentId);
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents/${documentId}/retry`)
+      .set("X-Owner-Id", ownerId)
+      .expect(HttpStatus.CREATED)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: documentId,
+          status: DocumentStatus.FAILED,
+          failureReason: "추출 텍스트가 비어 있습니다."
+        });
+      });
+
+    await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toBeNull();
+  });
+
   it("업로드, 목록, 상세, 재시도 흐름과 응답 shape을 검증한다", async () => {
     const uploadResponse = await request(app.getHttpServer())
       .post(`/projects/${projectId}/documents`)
@@ -470,6 +586,18 @@ describe("Document API", () => {
     const saved = await repository.findByProjectAndId(projectId, documentId);
     expect(saved!.snapshot().failureReason).toBe("원본 파일을 찾을 수 없습니다.");
   });
+
+  async function markDocumentFailed(documentId: string, reason = "텍스트 추출 실패") {
+    const aggregate = await repository.findByProjectAndId(projectId, documentId);
+
+    if (aggregate === null) {
+      throw new Error(`document not found: ${documentId}`);
+    }
+
+    aggregate.markFailed(reason, now);
+    await repository.save(aggregate);
+    return aggregate.snapshot();
+  }
 });
 
 class FixedClock implements Clock {

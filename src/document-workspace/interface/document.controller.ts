@@ -71,7 +71,7 @@ export class DocumentController {
         buffer: file.buffer
       }
     });
-    const processedDocument = await this.processUploadedPlainTextDocument(document, ownerId);
+    const processedDocument = await this.processPlainTextDocument(document, ownerId);
 
     return presentDocument(processedDocument);
   }
@@ -117,10 +117,11 @@ export class DocumentController {
       throw new ConflictException(result.reason);
     }
 
-    return presentDocument(result.document);
+    const processedDocument = await this.processPlainTextDocument(result.document, ownerId);
+    return presentDocument(processedDocument);
   }
 
-  private async processUploadedPlainTextDocument(
+  private async processPlainTextDocument(
     document: DocumentSnapshot,
     ownerId: string
   ): Promise<DocumentSnapshot> {
