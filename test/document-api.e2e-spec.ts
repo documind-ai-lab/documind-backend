@@ -34,6 +34,7 @@ describe("Document API", () => {
 
   let app: INestApplication;
   let repository: InMemoryDocumentRepository;
+  let documentTextRepository: InMemoryDocumentTextRepository;
   let storage: FakeDocumentStorage;
   let idGenerator: FixedIdGenerator;
   let accessChecker: ConfigurableProjectAccessChecker;
@@ -47,6 +48,7 @@ describe("Document API", () => {
     process.env.DOCUMENT_MAX_FILE_BYTES = String(50 * 1024 * 1024);
 
     repository = new InMemoryDocumentRepository();
+    documentTextRepository = new InMemoryDocumentTextRepository(repository);
     storage = new FakeDocumentStorage();
     accessChecker = new ConfigurableProjectAccessChecker();
     securityScanner = new FakeDocumentSecurityScanner();
@@ -64,7 +66,7 @@ describe("Document API", () => {
       .overrideProvider(DOCUMENT_REPOSITORY)
       .useValue(repository)
       .overrideProvider(DOCUMENT_TEXT_REPOSITORY)
-      .useValue(new InMemoryDocumentTextRepository())
+      .useValue(documentTextRepository)
       .overrideProvider(DOCUMENT_TEXT_EXTRACTOR)
       .useValue(new PlainTextDocumentTextExtractor())
       .overrideProvider(DOCUMENT_STORAGE)
@@ -102,6 +104,96 @@ describe("Document API", () => {
 
   it("plain text 처리 use case provider를 resolve할 수 있다", () => {
     expect(app.get(ProcessPlainTextExtractionUseCase)).toBeInstanceOf(ProcessPlainTextExtractionUseCase);
+  });
+
+  it("TXT 업로드 후 텍스트를 저장하고 READY 응답을 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("  회의 내용\n결정 사항  "), {
+        filename: "meeting.txt",
+        contentType: "text/plain"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    const text = await documentTextRepository.findByDocumentId(documentId);
+
+    expect(uploadResponse.body).toMatchObject({
+      id: documentId,
+      originalName: "meeting.txt",
+      extension: "txt",
+      status: DocumentStatus.READY,
+      failureReason: null
+    });
+    expect(text).toMatchObject({
+      documentId,
+      projectId,
+      ownerId,
+      content: "회의 내용\n결정 사항",
+      tokenCount: null
+    });
+  });
+
+  it("CSV 업로드 후 원본 CSV 텍스트를 저장하고 READY 응답을 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("품목,금액\n개발,1000"), {
+        filename: "estimate.csv",
+        contentType: "text/csv"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+    const text = await documentTextRepository.findByDocumentId(documentId);
+
+    expect(uploadResponse.body).toMatchObject({
+      id: documentId,
+      originalName: "estimate.csv",
+      extension: "csv",
+      status: DocumentStatus.READY,
+      failureReason: null
+    });
+    expect(text?.content).toBe("품목,금액\n개발,1000");
+  });
+
+  it("plain text 미지원 파일은 기존 추출 대기 상태를 유지한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("%PDF-1.7"), {
+        filename: "proposal.pdf",
+        contentType: "application/pdf"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+
+    expect(uploadResponse.body).toMatchObject({
+      id: documentId,
+      extension: "pdf",
+      status: DocumentStatus.TEXT_EXTRACTION_PENDING,
+      failureReason: null
+    });
+    await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toBeNull();
+  });
+
+  it("빈 TXT 업로드 후 FAILED 응답과 실패 사유를 반환한다", async () => {
+    const uploadResponse = await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("   \n\t   "), {
+        filename: "empty.txt",
+        contentType: "text/plain"
+      })
+      .expect(HttpStatus.CREATED);
+    const documentId = uploadResponse.body.id as string;
+
+    expect(uploadResponse.body).toMatchObject({
+      id: documentId,
+      extension: "txt",
+      status: DocumentStatus.FAILED,
+      failureReason: "추출 텍스트가 비어 있습니다."
+    });
+    await expect(documentTextRepository.findByDocumentId(documentId)).resolves.toBeNull();
   });
 
   it("업로드, 목록, 상세, 재시도 흐름과 응답 shape을 검증한다", async () => {
@@ -254,6 +346,31 @@ describe("Document API", () => {
         expect(body).not.toHaveProperty("storageProvider");
         expect(body).not.toHaveProperty("storageKey");
       });
+  });
+
+  it("TXT 보안 검사 감염 의심 파일은 plain text 추출을 실행하지 않는다", async () => {
+    securityScanner.result = { status: "infected", reason: "Eicar-Test-Signature" };
+
+    await request(app.getHttpServer())
+      .post(`/projects/${projectId}/documents`)
+      .set("X-Owner-Id", ownerId)
+      .attach("file", Buffer.from("회의 내용"), {
+        filename: "meeting.txt",
+        contentType: "text/plain"
+      })
+      .expect(HttpStatus.CREATED)
+      .expect(({ body }) => {
+        expect(body).toMatchObject({
+          id: "018ff4f0-0000-7000-8000-000000000101",
+          extension: "txt",
+          status: DocumentStatus.FAILED,
+          failureReason: "Eicar-Test-Signature"
+        });
+      });
+
+    await expect(
+      documentTextRepository.findByDocumentId("018ff4f0-0000-7000-8000-000000000101")
+    ).resolves.toBeNull();
   });
 
   it("보안 검사를 완료할 수 없으면 503 오류를 반환한다", async () => {

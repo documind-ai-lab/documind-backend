@@ -17,9 +17,12 @@ import { IncomingHttpHeaders } from "http";
 import {
   GetDocumentUseCase,
   ListDocumentsUseCase,
+  ProcessPlainTextExtractionUseCase,
   RetryDocumentUseCase,
   UploadDocumentUseCase
 } from "../application/document.use-cases";
+import { DocumentSnapshot } from "../domain/document";
+import { DocumentStatus } from "../domain/document-status";
 import { ListDocumentsQueryDto, parseOwnerIdHeader } from "./document.dto";
 import { presentDocument, presentDocumentPage } from "./document.presenter";
 
@@ -39,6 +42,7 @@ const uploadInterceptor = FileInterceptor("file", {
 export class DocumentController {
   constructor(
     private readonly uploadDocumentUseCase: UploadDocumentUseCase,
+    private readonly processPlainTextExtractionUseCase: ProcessPlainTextExtractionUseCase,
     private readonly listDocumentsUseCase: ListDocumentsUseCase,
     private readonly getDocumentUseCase: GetDocumentUseCase,
     private readonly retryDocumentUseCase: RetryDocumentUseCase
@@ -67,8 +71,9 @@ export class DocumentController {
         buffer: file.buffer
       }
     });
+    const processedDocument = await this.processUploadedPlainTextDocument(document, ownerId);
 
-    return presentDocument(document);
+    return presentDocument(processedDocument);
   }
 
   @Get()
@@ -113,5 +118,26 @@ export class DocumentController {
     }
 
     return presentDocument(result.document);
+  }
+
+  private async processUploadedPlainTextDocument(
+    document: DocumentSnapshot,
+    ownerId: string
+  ): Promise<DocumentSnapshot> {
+    if (document.status !== DocumentStatus.TEXT_EXTRACTION_PENDING) {
+      return document;
+    }
+
+    const result = await this.processPlainTextExtractionUseCase.execute({
+      projectId: document.projectId,
+      ownerId,
+      documentId: document.id
+    });
+
+    if (result.type === "skipped") {
+      return document;
+    }
+
+    return result.document;
   }
 }

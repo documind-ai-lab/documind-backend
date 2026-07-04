@@ -16,11 +16,11 @@ TXT/CSV 업로드 API가 `ProcessPlainTextExtractionUseCase`를 호출해 업로
 
 - Modify: `test/document-api.e2e-spec.ts`
 
-- [ ] **Step 1: e2e 테스트 repository 공유 보정**
+- [x] **Step 1: e2e 테스트 repository 공유 보정**
 
 현재 e2e는 `InMemoryDocumentTextRepository`를 provider override에 inline 생성한다. 테스트에서 저장된 `DocumentText`를 검증할 수 있도록 `documentTextRepository` 변수를 추가하고 override에 같은 인스턴스를 주입한다.
 
-- [ ] **Step 2: TXT 업로드 READY 테스트 추가**
+- [x] **Step 2: TXT 업로드 READY 테스트 추가**
 
 `POST /projects/:projectId/documents`에 TXT 파일을 업로드했을 때 다음을 검증한다.
 
@@ -29,21 +29,21 @@ TXT/CSV 업로드 API가 `ProcessPlainTextExtractionUseCase`를 호출해 업로
 - `failureReason`이 `null`
 - `DocumentText` content가 업로드 텍스트와 같다.
 
-- [ ] **Step 3: CSV 업로드 READY 테스트 추가**
+- [x] **Step 3: CSV 업로드 READY 테스트 추가**
 
 CSV 파일 업로드 후 다음을 검증한다.
 
 - 응답 `status`가 `READY`
 - 저장된 `DocumentText` content가 CSV 원문 텍스트와 같다.
 
-- [ ] **Step 4: PDF 업로드 pending 유지 테스트 추가**
+- [x] **Step 4: PDF 업로드 pending 유지 테스트 추가**
 
 PDF 파일 업로드 후 다음을 검증한다.
 
 - 응답 `status`가 `TEXT_EXTRACTION_PENDING`
 - `DocumentText`가 저장되지 않는다.
 
-- [ ] **Step 5: 빈 TXT 업로드 FAILED 테스트 추가**
+- [x] **Step 5: 빈 TXT 업로드 FAILED 테스트 추가**
 
 공백만 있는 TXT 파일 업로드 후 다음을 검증한다.
 
@@ -51,7 +51,7 @@ PDF 파일 업로드 후 다음을 검증한다.
 - `failureReason`이 `추출 텍스트가 비어 있습니다.`
 - `DocumentText`가 저장되지 않는다.
 
-- [ ] **Step 6: e2e RED 확인**
+- [x] **Step 6: e2e RED 확인**
 
 Run:
 
@@ -69,7 +69,7 @@ Expected:
 
 - Modify: `src/document-workspace/interface/document.controller.ts`
 
-- [ ] **Step 1: controller에 ProcessPlainTextExtractionUseCase 주입**
+- [x] **Step 1: controller에 ProcessPlainTextExtractionUseCase 주입**
 
 `document.use-cases` import에 `ProcessPlainTextExtractionUseCase`를 추가한다.
 
@@ -79,7 +79,7 @@ Expected:
 private readonly processPlainTextExtractionUseCase: ProcessPlainTextExtractionUseCase
 ```
 
-- [ ] **Step 2: upload 응답 전 추출 실행**
+- [x] **Step 2: upload 응답 전 추출 실행**
 
 업로드 use case 실행 직후 다음 helper를 호출한다.
 
@@ -94,7 +94,7 @@ helper 정책:
 - `failed`: `result.document`
 - `skipped`: upload 결과 `document`
 
-- [ ] **Step 3: e2e GREEN 확인**
+- [x] **Step 3: e2e GREEN 확인**
 
 Run:
 
@@ -112,7 +112,7 @@ Expected:
 
 - All changed files
 
-- [ ] **Step 1: forbidden-term scan**
+- [x] **Step 1: forbidden-term scan**
 
 Run:
 
@@ -122,7 +122,7 @@ rg -n "T[B]D|T[O]DO|placehol[d]er|fill i[n]|나중[에]|적[절]|미[정]|CHANGE
 
 Expected: no matches.
 
-- [ ] **Step 2: diff check**
+- [x] **Step 2: diff check**
 
 Run:
 
@@ -132,7 +132,7 @@ git diff --check
 
 Expected: PASS.
 
-- [ ] **Step 3: typecheck**
+- [x] **Step 3: typecheck**
 
 Run:
 
@@ -142,7 +142,7 @@ npm run typecheck
 
 Expected: PASS.
 
-- [ ] **Step 4: lint**
+- [x] **Step 4: lint**
 
 Run:
 
@@ -152,7 +152,7 @@ npm run lint
 
 Expected: PASS.
 
-- [ ] **Step 5: unit tests**
+- [x] **Step 5: unit tests**
 
 Run:
 
@@ -162,7 +162,7 @@ npm test
 
 Expected: PASS.
 
-- [ ] **Step 6: e2e tests**
+- [x] **Step 6: e2e tests**
 
 Run:
 
@@ -172,7 +172,7 @@ npm run test:e2e
 
 Expected: PASS.
 
-- [ ] **Step 7: build**
+- [x] **Step 7: build**
 
 Run:
 
