@@ -53,6 +53,20 @@ scripts/agy-pr-review 12 --repo documind-ai-lab/documind-client --post
 scripts/agy-pr-review 12 --post --max-diff-bytes 500000
 ```
 
+여러 PR에 같은 옵션으로 리뷰를 남겨야 할 때는 배치 실행 스크립트를 사용합니다.
+
+```bash
+scripts/agy-pr-review-batch 46 48 50 --post --timeout 10m
+```
+
+배치 실행은 PR 번호 순서대로 기존 `scripts/agy-pr-review`를 호출합니다. 중간에 실패한 PR이 있어도 기본적으로 남은 PR을 계속 실행하고, 마지막에 성공/실패 목록을 출력합니다. 하나라도 실패하면 exit code `1`로 종료합니다.
+
+첫 실패에서 중단해야 할 때는 `--stop-on-error`를 사용합니다.
+
+```bash
+scripts/agy-pr-review-batch 46 48 50 --post --timeout 10m --stop-on-error
+```
+
 ## 템플릿 파일
 
 리뷰 문구는 Python 코드 안에 직접 작성하지 않고 템플릿 파일로 관리합니다.
@@ -85,6 +99,7 @@ scripts/agy-pr-review 12 --post --max-diff-bytes 500000
 - 기존 댓글 갱신은 `--post --update-existing`을 함께 사용한 경우에만 수행합니다.
 - 기존 댓글 갱신 시에는 기존 댓글 제목의 차수를 유지합니다.
 - 댓글 갱신 시에는 GitHub API pagination 결과를 모아 기존 Antigravity 리뷰 댓글을 찾습니다.
+- 여러 PR을 일괄 리뷰할 때는 `scripts/agy-pr-review-batch`를 사용하고, 배치 스크립트는 각 PR별로 새 Antigravity 리뷰 댓글을 생성합니다.
 - GitHub inline review가 아니라 PR Conversation의 일반 댓글로 남깁니다.
 - 병합 전에는 `agy` 리뷰 결과, 로컬 검증 결과, 남은 리스크를 PR 댓글이나 본문에 남깁니다.
 

@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Run Antigravity PR review for multiple pull requests."""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+from typing import Sequence
+
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+SINGLE_REVIEW_SCRIPT = SCRIPT_DIR / "agy-pr-review"
+
+
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="여러 PR 번호를 받아 scripts/agy-pr-review를 순차 실행합니다.",
+    )
+    parser.add_argument("pr_numbers", nargs="+", help="리뷰할 Pull Request 번호 목록")
+    parser.add_argument("--repo", help="owner/repo 형식의 저장소명")
+    parser.add_argument("--post", action="store_true", help="리뷰 결과를 새 PR 댓글로 생성합니다.")
+    parser.add_argument(
+        "--update-existing",
+        action="store_true",
+        help="기존 agy 리뷰 댓글이 있으면 새 댓글 대신 갱신합니다. --post와 함께 사용합니다.",
+    )
+    parser.add_argument("--timeout", help="agy --print-timeout 값입니다.")
+    parser.add_argument("--model", help="agy에서 사용할 모델을 지정합니다.")
+    parser.add_argument("--max-diff-bytes", type=int, help="agy에 전달할 PR diff의 최대 UTF-8 바이트 수입니다.")
+    parser.add_argument(
+        "--stop-on-error",
+        action="store_true",
+        help="PR 하나가 실패하면 남은 PR 실행을 중단합니다.",
+    )
+    args = parser.parse_args(argv)
+
+    invalid_numbers = [pr_number for pr_number in args.pr_numbers if not pr_number.isdigit()]
+    if invalid_numbers:
+        parser.error(f"PR 번호는 숫자만 입력해주세요: {', '.join(invalid_numbers)}")
+    if args.update_existing and not args.post:
+        parser.error("--update-existing은 --post와 함께 사용해주세요.")
+
+    return args
+
+
+def build_command(args: argparse.Namespace, pr_number: str) -> list[str]:
+    command = [sys.executable, str(SINGLE_REVIEW_SCRIPT), pr_number]
+
+    if args.repo:
+        command.extend(["--repo", args.repo])
+    if args.post:
+        command.append("--post")
+    if args.update_existing:
+        command.append("--update-existing")
+    if args.timeout:
+        command.extend(["--timeout", args.timeout])
+    if args.model:
+        command.extend(["--model", args.model])
+    if args.max_diff_bytes is not None:
+        command.extend(["--max-diff-bytes", str(args.max_diff_bytes)])
+
+    return command
+
+
+def run_review(command: list[str]) -> int:
+    result = subprocess.run(command, text=True)
+    return result.returncode
+
+
+def main_with_args(argv: Sequence[str] | None = None) -> int:
+    args = parse_args(argv)
+    succeeded: list[str] = []
+    failed: list[str] = []
+
+    for pr_number in args.pr_numbers:
+        print(f"\n== PR #{pr_number} Antigravity 리뷰 실행 ==")
+        returncode = run_review(build_command(args, pr_number))
+
+        if returncode == 0:
+            succeeded.append(pr_number)
+            continue
+
+        failed.append(pr_number)
+        print(f"PR #{pr_number} 리뷰 실패: exit code {returncode}", file=sys.stderr)
+        if args.stop_on_error:
+            break
+
+    print("\n== Antigravity 배치 리뷰 결과 ==")
+    print(f"성공: {', '.join(succeeded) if succeeded else '없음'}")
+    print(f"실패: {', '.join(failed) if failed else '없음'}")
+
+    if failed:
+        return 1
+    return 0
+
+
+def main() -> int:
+    return main_with_args()
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
