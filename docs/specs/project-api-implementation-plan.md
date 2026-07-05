@@ -1068,18 +1068,14 @@ gh pr create --base develop --head feat/22-project-api --title "feat: Project AP
 
 PR 본문은 기존 `.github/pull_request_template.md` 구조를 사용하고 `Refs #22`, 설계 판단, 검증 결과, 남은 리스크를 기록한다.
 
-- [ ] **Step 4: Antigravity 리뷰와 머지 전 댓글**
+- [ ] **Step 4: 자체 리뷰와 머지 전 댓글**
 
-Run:
-
-```bash
-scripts/agy-pr-review <PR번호> --post --timeout 10m
-```
+Codex가 PR diff 기준으로 버그, API 계약 불일치, 테스트 누락을 점검한다.
 
 머지 전 댓글은 다음 문장으로 시작한다.
 
 ```md
-Antigravity 리뷰 결과를 확인했습니다.
+자체 리뷰 결과를 확인했습니다.
 ```
 
 추가 반영이 없으면 다음을 포함한다.
