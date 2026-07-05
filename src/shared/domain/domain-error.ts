@@ -5,6 +5,7 @@ export type DomainErrorCode =
   | "DOCUMENT_STATE_CONFLICT"
   | "DOCUMENT_STORAGE_ERROR"
   | "DOCUMENT_SECURITY_SCAN_UNAVAILABLE"
+  | "CHAT_ANSWER_GENERATION_FAILED"
   | "VALIDATION_ERROR";
 
 export class DomainError extends Error {

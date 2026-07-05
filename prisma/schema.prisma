@@ -41,6 +41,13 @@ enum OrphanDocumentFileStatus {
   @@schema("documind_backend")
 }
 
+enum ChatRole {
+  USER
+  ASSISTANT
+
+  @@schema("documind_backend")
+}
+
 model Project {
   id                 String        @id @db.Uuid
   ownerId            String        @map("owner_id") @db.Uuid
@@ -54,9 +61,43 @@ model Project {
   updatedAt          DateTime      @map("updated_at") @db.Timestamptz(6)
   lastActivityAt     DateTime      @map("last_activity_at") @db.Timestamptz(6)
   documents          Document[]
+  chatMessages       ChatMessage[]
 
   @@index([status, lastActivityAt, id], map: "idx_projects_status_last_activity_id")
   @@map("projects")
+  @@schema("documind_backend")
+}
+
+model ChatMessage {
+  id        String       @id @db.Uuid
+  projectId String       @map("project_id") @db.Uuid
+  ownerId   String       @map("owner_id") @db.Uuid
+  role      ChatRole
+  content   String
+  createdAt DateTime     @map("created_at") @db.Timestamptz(6)
+  project   Project      @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  sources   ChatSource[]
+
+  @@index([projectId, createdAt, id], map: "idx_chat_messages_project_created_id")
+  @@map("chat_messages")
+  @@schema("documind_backend")
+}
+
+model ChatSource {
+  id          String      @id @db.Uuid
+  messageId   String      @map("message_id") @db.Uuid
+  documentId  String      @map("document_id") @db.Uuid
+  sourceIndex Int         @map("source_index")
+  title       String      @db.VarChar(255)
+  quote       String      @db.VarChar(1000)
+  relevance   Decimal?    @db.Decimal(5, 4)
+  createdAt   DateTime    @map("created_at") @db.Timestamptz(6)
+  message     ChatMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  document    Document    @relation(fields: [documentId], references: [id], onDelete: Restrict)
+
+  @@unique([messageId, sourceIndex], map: "uq_chat_sources_message_source_index")
+  @@index([documentId], map: "idx_chat_sources_document_id")
+  @@map("chat_sources")
   @@schema("documind_backend")
 }
 
@@ -76,6 +117,7 @@ model Document {
   updatedAt       DateTime       @map("updated_at") @db.Timestamptz(6)
   project         Project        @relation(fields: [projectId], references: [id], onDelete: Restrict)
   text            DocumentText?
+  chatSources     ChatSource[]
 
   @@index([projectId, createdAt, id], map: "idx_documents_project_created_id")
   @@map("documents")
