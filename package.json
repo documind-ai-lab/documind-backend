@@ -15,7 +15,7 @@
     "lint": "eslint \"{src,test}/**/*.ts\"",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "test:tools": "python3 -m unittest scripts/test_agy_pr_review.py",
+    "test:tools": "python3 -m unittest scripts/test_agy_pr_review.py scripts/test_agy_pr_review_workflow.py",
     "test:e2e": "jest --config jest.e2e.config.ts --runInBand",
     "test:integration": "jest --config jest.integration.config.ts --runInBand",
     "prisma:generate": "prisma generate",
