@@ -27,9 +27,9 @@
 - [ ] 이슈의 목표와 범위를 충족한다.
 - [ ] 불필요한 파일 변경이 없다.
 - [ ] 남은 리스크를 확인하고 기록했다.
-- [ ] Codex 리뷰 결과 댓글을 남겼다.
-- [ ] Codex 리뷰 반영 결과 댓글을 남겼다.
-- [ ] 병합 진행 판단 댓글을 남겼다.
+- [ ] `templates/codex-review-result-comment.md` 기준으로 Codex 리뷰 결과 댓글을 남겼다.
+- [ ] `templates/codex-review-response-comment.md` 기준으로 Codex 리뷰 반영 결과 댓글을 남겼다.
+- [ ] `templates/codex-merge-decision-comment.md` 기준으로 병합 진행 판단 댓글을 남겼다.
 - [ ] 병합 후 연결 이슈 close와 Project `Done` 확인이 필요함을 인지했다.
 
 ## 남은 리스크
