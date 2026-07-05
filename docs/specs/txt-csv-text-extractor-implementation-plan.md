@@ -1,6 +1,6 @@
 # TXT CSV Text Extractor Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 이 문서는 TXT/CSV 텍스트 추출 작업을 작업 단위로 진행하기 위한 실행 계획입니다. 각 단계는 체크박스(`- [ ]`) 기준으로 추적합니다.
 
 **Goal:** TXT/CSV 원본 파일을 읽어 `DocumentText`로 저장하고 Document를 `READY`로 전환하는 첫 텍스트 추출 adapter를 구현한다.
 

@@ -1,6 +1,6 @@
 # Orphan File Cleanup Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> 이 문서는 고아 파일 정리 흐름을 작업 단위로 진행하기 위한 실행 계획입니다. 각 단계는 체크박스(`- [ ]`) 기준으로 추적합니다.
 
 **Goal:** 업로드 실패 후 남은 로컬 고아 파일을 DB 후보 목록에 기록하고 자동 정리 루프가 재시도 가능하게 삭제한다.
 

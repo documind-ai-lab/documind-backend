@@ -178,4 +178,4 @@ Expected: PASS.
 - `DocumentTextRepository` port와 Prisma adapter가 있다.
 - `document_texts` 저장 구조가 Prisma schema와 migration에 반영된다.
 - 공개 HTTP API 변경 없이 기존 Document API 회귀 테스트가 통과한다.
-- PR 생성 후 Codex가 PR diff 기준 자체 리뷰를 수행하고 병합 차단 수준의 결함이 없는지 확인한다.
+- PR 생성 후 Codex가 PR diff 기준 리뷰를 수행하고 병합 차단 수준의 결함이 없는지 확인한다.
