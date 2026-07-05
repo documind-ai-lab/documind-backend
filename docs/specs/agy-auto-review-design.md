@@ -68,7 +68,7 @@ workflow는 `pull_request_target` 이벤트를 사용한다.
 
 draft PR은 실행하지 않는다. draft에서 ready 상태로 바뀔 때 `ready_for_review` 이벤트로 리뷰를 실행한다.
 
-base branch는 `develop`을 우선 대상으로 한다. 이후 `main` 운영 반영 PR에도 같은 리뷰가 필요해지면 branch filter를 확장한다.
+현재 저장소의 default branch는 `develop`이다. `pull_request_target` workflow는 default branch에 workflow 파일이 존재해야 안정적으로 실행되므로, 자동 리뷰 workflow는 `develop`에 병합된 이후 새 PR부터 적용한다. 이후 `main` 운영 반영 PR에도 같은 리뷰가 필요해지면 branch filter를 확장한다.
 
 ## 실행 주체
 
