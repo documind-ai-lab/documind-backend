@@ -26,12 +26,14 @@ src/chat-workspace/domain/chat.errors.ts
 src/chat-workspace/domain/chat-message.ts
 src/chat-workspace/application/chat-answer-generator.ts
 src/chat-workspace/application/chat-context-reader.ts
+src/chat-workspace/application/chat-project-access-checker.ts
 src/chat-workspace/application/chat-project-activity-updater.ts
 src/chat-workspace/application/chat.repository.ts
 src/chat-workspace/application/chat.use-cases.ts
 src/chat-workspace/infrastructure/mock-chat-answer-generator.ts
 src/chat-workspace/infrastructure/prisma-chat-context-reader.ts
 src/chat-workspace/infrastructure/prisma-chat.repository.ts
+src/project-workspace/infrastructure/prisma-chat-project-access-checker.ts
 src/project-workspace/infrastructure/prisma-chat-project-activity-updater.ts
 src/chat-workspace/interface/chat.controller.ts
 src/chat-workspace/interface/chat.dto.ts
@@ -149,6 +151,7 @@ npm test -- test/chat-domain.spec.ts
 **Files:**
 - Create: `src/chat-workspace/application/chat-answer-generator.ts`
 - Create: `src/chat-workspace/application/chat-context-reader.ts`
+- Create: `src/chat-workspace/application/chat-project-access-checker.ts`
 - Create: `src/chat-workspace/application/chat-project-activity-updater.ts`
 - Create: `src/chat-workspace/application/chat.repository.ts`
 - Create: `src/chat-workspace/application/chat.use-cases.ts`
@@ -163,6 +166,7 @@ npm test -- test/chat-domain.spec.ts
 - `ChatRepository`
 - `ChatAnswerGenerator`
 - `ChatContextReader`
+- `ChatProjectAccessChecker`
 - `ChatProjectActivityUpdater`
 
 - [ ] **Step 2: 질문 생성 use case 테스트 작성**
@@ -211,6 +215,7 @@ npm test -- test/chat-use-cases.spec.ts
 - Create: `src/chat-workspace/infrastructure/mock-chat-answer-generator.ts`
 - Create: `src/chat-workspace/infrastructure/prisma-chat-context-reader.ts`
 - Create: `src/chat-workspace/infrastructure/prisma-chat.repository.ts`
+- Create: `src/project-workspace/infrastructure/prisma-chat-project-access-checker.ts`
 - Create: `src/project-workspace/infrastructure/prisma-chat-project-activity-updater.ts`
 - Create: `test/chat-api.integration-spec.ts`
 
@@ -236,9 +241,18 @@ npm test -- test/chat-use-cases.spec.ts
 - Assistant source 저장
 - Project별 목록 조회
 
-- [ ] **Step 4: integration smoke 작성**
+- [ ] **Step 4: Project adapter 구현**
+
+구현 항목:
+
+- `PrismaChatProjectAccessChecker`
+- `PrismaChatProjectActivityUpdater`
+
+`PrismaChatProjectAccessChecker`는 Project 존재, owner 일치, Project 상태를 반환한다.
 
 `PrismaChatProjectActivityUpdater`는 Project의 `lastActivityAt`을 갱신한다.
+
+- [ ] **Step 5: integration smoke 작성**
 
 검증 항목:
 

@@ -74,7 +74,7 @@ src/
 
 Chat Workspace는 Document Workspace의 Prisma 모델에 직접 의존하지 않는다. application 계층에서는 `ChatContextReader` port를 사용하고, infrastructure adapter가 `DocumentText`를 조회한다.
 
-Project 접근 확인은 기존 `ProjectAccessChecker` port를 재사용한다.
+Project 접근 확인은 Chat Workspace의 `ChatProjectAccessChecker` port 뒤에 둔다. 실제 Project 조회와 상태 확인은 Project Workspace adapter가 구현한다.
 
 ## 데이터 모델
 
@@ -220,7 +220,25 @@ context 제한:
 
 ## Project activity port
 
-Chat Workspace는 질문 생성 성공 후 Project의 `lastActivityAt` 갱신을 요청한다. 이 책임은 Project Workspace adapter가 구현하는 port 뒤에 둔다.
+Chat Workspace는 Project 접근 확인과 활동 시각 갱신을 Project Workspace adapter에 위임한다.
+
+```ts
+export const CHAT_PROJECT_ACCESS_CHECKER = Symbol("CHAT_PROJECT_ACCESS_CHECKER");
+
+export type ChatProjectAccessResult = {
+  projectId: string;
+  ownerId: string;
+  status: "ACTIVE" | "ARCHIVED";
+};
+
+export interface ChatProjectAccessChecker {
+  ensureReadableProject(projectId: string, ownerId: string): Promise<ChatProjectAccessResult>;
+}
+```
+
+질문 생성과 대화 목록 조회는 Project 읽기 권한을 요구한다. 질문 생성은 추가로 Project 상태가 `ACTIVE`인지 확인한다.
+
+Chat Workspace는 질문 생성 성공 후 Project의 `lastActivityAt` 갱신을 요청한다. 이 책임도 Project Workspace adapter가 구현하는 port 뒤에 둔다.
 
 ```ts
 export const CHAT_PROJECT_ACTIVITY_UPDATER = Symbol("CHAT_PROJECT_ACTIVITY_UPDATER");
