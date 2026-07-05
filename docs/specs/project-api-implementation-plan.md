@@ -1029,7 +1029,7 @@ Tested: npm test
 Not-tested: 운영 배포 환경 smoke는 이번 이슈 범위가 아님"
 ```
 
-## Task 10: PR 생성 전 자체 점검
+## Task 10: PR 생성 전 작업 점검
 
 **Files:**
 - Modify only when verification reveals a concrete defect
@@ -1068,14 +1068,14 @@ gh pr create --base develop --head feat/22-project-api --title "feat: Project AP
 
 PR 본문은 기존 `.github/pull_request_template.md` 구조를 사용하고 `Refs #22`, 설계 판단, 검증 결과, 남은 리스크를 기록한다.
 
-- [ ] **Step 4: 자체 리뷰와 머지 전 댓글**
+- [ ] **Step 4: Codex 리뷰와 병합 전 댓글**
 
 Codex가 PR diff 기준으로 버그, API 계약 불일치, 테스트 누락을 점검한다.
 
-머지 전 댓글은 다음 문장으로 시작한다.
+병합 전 댓글은 다음 문장으로 시작한다.
 
 ```md
-자체 리뷰 결과를 확인했습니다.
+Codex 리뷰 결과를 확인했습니다.
 ```
 
 추가 반영이 없으면 다음을 포함한다.
@@ -1086,7 +1086,7 @@ Codex가 PR diff 기준으로 버그, API 계약 불일치, 테스트 누락을 
 - 추가 반영할 항목 없음
 ```
 
-## 자체 리뷰 결과
+## Codex 리뷰 결과
 
 - Spec coverage: Project 생성, 목록, 상세, 수정, 보관, 복원, status 필터, 보관 정책, demo owner, Prisma schema, 오류 응답, 테스트 전략, 실행 문서가 Task 1~10에 포함되어 있다.
 - 금지어 검색: 계획서 저장 후 `rg -n 'T[B]D|T[O]DO|place.holder|fill[ ]in|나중[에]|적[절]|미[정]|CHANGE[_]ME' docs/specs/project-api-implementation-plan.md`를 실행한다.
