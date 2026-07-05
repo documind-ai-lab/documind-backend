@@ -31,6 +31,7 @@ describe("Chat API", () => {
   const projectId = "018ff4f0-0000-7000-8000-000000000001";
   const ownerId = "018ff4f0-0000-7000-8000-000000000002";
   const now = new Date("2026-07-05T01:00:00.000Z");
+  const assistantCreatedAt = new Date(now.getTime() + 1);
 
   let app: INestApplication;
   let repository: InMemoryChatRepository;
@@ -113,7 +114,7 @@ describe("Chat API", () => {
               title: "견적서.pdf",
               quote: "총액 1,000만원",
               relevance: 0.9,
-              createdAt: now.toISOString()
+              createdAt: assistantCreatedAt.toISOString()
             }
           ]
         });

@@ -77,13 +77,14 @@ export class CreateChatMessageUseCase {
       contexts,
       history
     });
-    const now = this.clock.now();
+    const userCreatedAt = this.clock.now();
+    const assistantCreatedAt = new Date(userCreatedAt.getTime() + 1);
     const userMessage = ChatMessage.createUser({
       id: this.idGenerator.nextId(),
       projectId: command.projectId,
       ownerId: command.ownerId,
       content: question,
-      createdAt: now
+      createdAt: userCreatedAt
     });
     const assistantMessageId = this.idGenerator.nextId();
     const assistantMessage = ChatMessage.createAssistant({
@@ -91,7 +92,7 @@ export class CreateChatMessageUseCase {
       projectId: command.projectId,
       ownerId: command.ownerId,
       content: answer.content,
-      createdAt: now,
+      createdAt: assistantCreatedAt,
       sources: answer.sources.map((source, index) => ({
         id: this.idGenerator.nextId(),
         documentId: source.documentId,
@@ -99,12 +100,12 @@ export class CreateChatMessageUseCase {
         title: source.title,
         quote: source.quote,
         relevance: source.relevance,
-        createdAt: now
+        createdAt: assistantCreatedAt
       }))
     });
 
     await this.repository.saveConversation(userMessage, assistantMessage);
-    await this.recordActivity(command.projectId, command.ownerId, now);
+    await this.recordActivity(command.projectId, command.ownerId, assistantCreatedAt);
 
     return {
       userMessage: userMessage.snapshot(),

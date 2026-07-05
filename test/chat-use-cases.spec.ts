@@ -26,6 +26,7 @@ import { ChatRole } from "../src/chat-workspace/domain/chat-role";
 
 describe("Chat use cases", () => {
   const now = new Date("2026-07-05T01:00:00.000Z");
+  const assistantCreatedAt = new Date(now.getTime() + 1);
   const projectId = "018ff4f0-0000-7000-8000-000000000001";
   const ownerId = "018ff4f0-0000-7000-8000-000000000002";
 
@@ -99,7 +100,7 @@ describe("Chat use cases", () => {
       ownerId,
       question: "견적서 분석해줘"
     });
-    expect(activityUpdater.requests).toEqual([{ projectId, ownerId, occurredAt: now }]);
+    expect(activityUpdater.requests).toEqual([{ projectId, ownerId, occurredAt: assistantCreatedAt }]);
   });
 
   it("보관된 프로젝트에는 메시지를 생성하지 않는다", async () => {
