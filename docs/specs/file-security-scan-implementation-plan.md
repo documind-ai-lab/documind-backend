@@ -332,8 +332,7 @@ npm run test:e2e
 RUN_DB_INTEGRATION=true npm run test:integration
 ```
 
-Antigravity 리뷰:
+병합 전 자체 리뷰:
 
-```bash
-scripts/agy-pr-review <PR번호> --post --timeout 10m
-```
+- Codex가 PR diff 기준으로 버그, 보안 리스크, 테스트 누락을 점검한다.
+- 추가 반영 항목이 없으면 PR 댓글에 자체 리뷰 결과와 검증 명령을 기록한다.

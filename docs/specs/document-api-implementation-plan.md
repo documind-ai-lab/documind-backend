@@ -554,15 +554,11 @@ PR 본문은 `.github/pull_request_template.md` 구조를 사용한다.
 
 PR: `#39`
 
-- [ ] **Step 4: Antigravity 리뷰**
+- [ ] **Step 4: 병합 전 자체 리뷰**
 
-Run:
+Codex가 PR diff 기준으로 버그, API 계약 불일치, 테스트 누락을 점검한다.
 
-```bash
-scripts/agy-pr-review <PR번호> --post --timeout 10m
-```
-
-병합 전에는 최신 Antigravity 리뷰에서 `병합 차단`이 없는지 확인한다.
+병합 전에는 자체 리뷰 결과와 검증 명령을 PR 댓글에 남기고, 추가 반영 항목이 없는지 확인한다.
 
 ## 완료 기준
 
