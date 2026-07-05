@@ -15,6 +15,25 @@ Antigravity CLI(`agy`)를 PR 일반 댓글 리뷰어로 사용합니다.
 
 스크립트는 로컬 `agy` CLI 설정에 의존하지 않고 기본 실행 시에도 `--model "Gemini 3.1 Pro (High)"`를 명시해서 실행합니다.
 
+## 자동 실행
+
+PR 생성 또는 업데이트 시 Antigravity 리뷰는 GitHub Actions에서 자동 실행합니다.
+
+자동 실행 조건은 다음과 같습니다.
+
+- workflow event: `pull_request_target`
+- target branch: `develop`
+- activity: `opened`, `reopened`, `synchronize`, `ready_for_review`
+- runner label: `[self-hosted, macOS, documind-agy-review]`
+
+workflow는 PR head branch를 checkout하지 않습니다. base SHA를 checkout한 뒤 현재 저장소의 신뢰된 `scripts/agy-pr-review`만 실행합니다.
+
+```bash
+scripts/agy-pr-review "$PR_NUMBER" --post --timeout 10m
+```
+
+이 workflow가 `develop`에 병합되기 전까지는 자동 실행되지 않습니다. workflow를 추가하는 PR 자체는 수동 Antigravity 리뷰가 필요합니다.
+
 ## 사용법
 
 리뷰 결과를 터미널에만 출력합니다.
