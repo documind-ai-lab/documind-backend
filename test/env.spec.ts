@@ -1,6 +1,43 @@
 import { loadEnv } from "../src/shared/infrastructure/env";
 
 describe("loadEnv", () => {
+  it("Chat answer generator 기본값과 AI service 기본 설정을 파싱한다", () => {
+    const env = loadEnv(baseEnv());
+
+    expect(env.chatAnswerGeneratorProvider).toBe("mock");
+    expect(env.aiServiceBaseUrl).toBe("http://localhost:8001");
+    expect(env.aiServiceTimeoutMs).toBe(30000);
+  });
+
+  it("CHAT_ANSWER_GENERATOR_PROVIDER가 ai-service이면 AI service 설정을 파싱한다", () => {
+    const env = loadEnv({
+      ...baseEnv(),
+      CHAT_ANSWER_GENERATOR_PROVIDER: "ai-service",
+      AI_SERVICE_BASE_URL: "http://127.0.0.1:8001/",
+      AI_SERVICE_TIMEOUT_MS: "5000"
+    });
+
+    expect(env.chatAnswerGeneratorProvider).toBe("ai-service");
+    expect(env.aiServiceBaseUrl).toBe("http://127.0.0.1:8001");
+    expect(env.aiServiceTimeoutMs).toBe(5000);
+  });
+
+  it("Chat answer generator provider와 AI service URL을 검증한다", () => {
+    expect(() =>
+      loadEnv({
+        ...baseEnv(),
+        CHAT_ANSWER_GENERATOR_PROVIDER: "openai"
+      })
+    ).toThrow("CHAT_ANSWER_GENERATOR_PROVIDER는 mock 또는 ai-service여야 합니다.");
+
+    expect(() =>
+      loadEnv({
+        ...baseEnv(),
+        AI_SERVICE_BASE_URL: "localhost:8001"
+      })
+    ).toThrow("AI_SERVICE_BASE_URL는 http 또는 https URL이어야 합니다.");
+  });
+
   it("DOCUMENT_STORAGE_PROVIDER 기본값은 local이며 local base path를 절대 경로로 변환한다", () => {
     const env = loadEnv(baseEnv());
 
