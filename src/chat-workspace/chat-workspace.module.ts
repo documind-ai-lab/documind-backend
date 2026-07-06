@@ -19,11 +19,13 @@ import {
 import { CHAT_REPOSITORY, ChatRepository } from "./application/chat.repository";
 import { CreateChatMessageUseCase, ListChatMessagesUseCase } from "./application/chat.use-cases";
 import { ChatController } from "./interface/chat.controller";
+import { AiServiceChatAnswerGenerator } from "./infrastructure/ai-service-chat-answer-generator";
 import { MockChatAnswerGenerator } from "./infrastructure/mock-chat-answer-generator";
 import { PrismaChatContextReader } from "./infrastructure/prisma-chat-context-reader";
 import { PrismaChatProjectAccessChecker } from "./infrastructure/prisma-chat-project-access-checker";
 import { PrismaChatProjectActivityUpdater } from "./infrastructure/prisma-chat-project-activity-updater";
 import { PrismaChatRepository } from "./infrastructure/prisma-chat.repository";
+import { loadEnv } from "../shared/infrastructure/env";
 
 @Module({
   controllers: [ChatController],
@@ -32,7 +34,21 @@ import { PrismaChatRepository } from "./infrastructure/prisma-chat.repository";
     { provide: ID_GENERATOR, useClass: UuidV7Generator },
     { provide: APPLICATION_LOGGER, useClass: NestApplicationLogger },
     { provide: CHAT_REPOSITORY, useClass: PrismaChatRepository },
-    { provide: CHAT_ANSWER_GENERATOR, useClass: MockChatAnswerGenerator },
+    {
+      provide: CHAT_ANSWER_GENERATOR,
+      useFactory: () => {
+        const env = loadEnv();
+
+        if (env.chatAnswerGeneratorProvider === "mock") {
+          return new MockChatAnswerGenerator();
+        }
+
+        return new AiServiceChatAnswerGenerator({
+          baseUrl: env.aiServiceBaseUrl,
+          timeoutMs: env.aiServiceTimeoutMs
+        });
+      }
+    },
     { provide: CHAT_CONTEXT_READER, useClass: PrismaChatContextReader },
     { provide: CHAT_PROJECT_ACCESS_CHECKER, useClass: PrismaChatProjectAccessChecker },
     { provide: CHAT_PROJECT_ACTIVITY_UPDATER, useClass: PrismaChatProjectActivityUpdater },

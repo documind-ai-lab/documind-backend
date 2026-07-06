@@ -1,6 +1,7 @@
 import { resolve } from "path";
 
 export type DocumentStorageProvider = "local" | "s3";
+export type ChatAnswerGeneratorProvider = "mock" | "ai-service";
 
 export type DocumentStorageS3Env = {
   bucket: string;
@@ -10,6 +11,9 @@ export type DocumentStorageS3Env = {
 };
 
 export type AppEnv = {
+  aiServiceBaseUrl: string;
+  aiServiceTimeoutMs: number;
+  chatAnswerGeneratorProvider: ChatAnswerGeneratorProvider;
   databaseUrl: string;
   demoOwnerId: string;
   documentMaxFileBytes: number;
@@ -27,6 +31,17 @@ export type AppEnv = {
 export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
   const databaseUrl = requireEnv(env, "DATABASE_URL");
   const demoOwnerId = requireEnv(env, "DOCUMIND_DEMO_OWNER_ID");
+  const chatAnswerGeneratorProvider = parseChatAnswerGeneratorProvider(
+    env.CHAT_ANSWER_GENERATOR_PROVIDER ?? "mock"
+  );
+  const aiServiceBaseUrl = parseHttpUrl(
+    env.AI_SERVICE_BASE_URL ?? "http://localhost:8001",
+    "AI_SERVICE_BASE_URL"
+  );
+  const aiServiceTimeoutMs = parsePositiveInteger(
+    env.AI_SERVICE_TIMEOUT_MS ?? "30000",
+    "AI_SERVICE_TIMEOUT_MS"
+  );
   const documentStorageProvider = parseDocumentStorageProvider(
     env.DOCUMENT_STORAGE_PROVIDER ?? "local"
   );
@@ -68,6 +83,9 @@ export function loadEnv(env: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   return {
+    aiServiceBaseUrl,
+    aiServiceTimeoutMs,
+    chatAnswerGeneratorProvider,
     databaseUrl,
     demoOwnerId,
     documentMaxFileBytes,
@@ -113,6 +131,14 @@ function parseDocumentStorageProvider(value: string): DocumentStorageProvider {
   throw new Error("DOCUMENT_STORAGE_PROVIDER는 local 또는 s3여야 합니다.");
 }
 
+function parseChatAnswerGeneratorProvider(value: string): ChatAnswerGeneratorProvider {
+  if (value === "mock" || value === "ai-service") {
+    return value;
+  }
+
+  throw new Error("CHAT_ANSWER_GENERATOR_PROVIDER는 mock 또는 ai-service여야 합니다.");
+}
+
 function parseDocumentStorageS3(env: NodeJS.ProcessEnv): DocumentStorageS3Env {
   const endpoint = env.DOCUMENT_STORAGE_S3_ENDPOINT?.trim() ?? "";
 
@@ -135,6 +161,22 @@ function parsePositiveInteger(value: string, key: string): number {
   }
 
   return parsed;
+}
+
+function parseHttpUrl(value: string, key: string): string {
+  const trimmed = value.trim();
+
+  try {
+    const url = new URL(trimmed);
+
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("invalid protocol");
+    }
+
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    throw new Error(`${key}는 http 또는 https URL이어야 합니다.`);
+  }
 }
 
 function isUuid(value: string): boolean {
