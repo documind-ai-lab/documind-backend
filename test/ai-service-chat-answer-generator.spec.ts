@@ -104,6 +104,38 @@ describe("AiServiceChatAnswerGenerator", () => {
     ).rejects.toThrow("AI 서비스 응답 content는 비어 있지 않은 문자열이어야 합니다.");
   });
 
+  it("AI service 응답 relevance 범위를 검증한다", async () => {
+    const generator = new AiServiceChatAnswerGenerator({
+      baseUrl: "http://localhost:8001",
+      timeoutMs: 5000,
+      fetchFn: new RecordingFetch({
+        ok: true,
+        status: 200,
+        body: {
+          content: "견적서 기준 검토 결과입니다. [1]",
+          sources: [
+            {
+              documentId: "document-1",
+              title: "견적서.txt",
+              quote: "총액 1,000만원",
+              relevance: 1.5
+            }
+          ]
+        }
+      }).fetch
+    });
+
+    await expect(
+      generator.generate({
+        projectId: "project-1",
+        ownerId: "owner-1",
+        question: "분석해줘",
+        contexts: [],
+        history: []
+      })
+    ).rejects.toThrow("AI 서비스 응답 sources[0].relevance는 0 이상 1 이하이어야 합니다.");
+  });
+
   it("실제 HTTP 경로로 AI service 계약을 호출한다", async () => {
     const aiService = await startAiServiceStub();
     const generator = new AiServiceChatAnswerGenerator({
