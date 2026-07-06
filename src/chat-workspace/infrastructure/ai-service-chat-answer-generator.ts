@@ -120,6 +120,10 @@ function parseChatAnswerSource(source: unknown, index: number): ChatAnswerSource
     throw new Error(`AI 서비스 응답 sources[${index}].relevance는 number 또는 null이어야 합니다.`);
   }
 
+  if (typeof relevance === "number" && (relevance < 0 || relevance > 1)) {
+    throw new Error(`AI 서비스 응답 sources[${index}].relevance는 0 이상 1 이하이어야 합니다.`);
+  }
+
   return { documentId, title, quote, relevance };
 }
 
