@@ -1,3 +1,5 @@
+import { createServer, IncomingMessage, Server, ServerResponse } from "http";
+import { AddressInfo } from "net";
 import {
   AiServiceChatAnswerGenerator,
   ChatAnswerFetch,
@@ -101,6 +103,52 @@ describe("AiServiceChatAnswerGenerator", () => {
       })
     ).rejects.toThrow("AI 서비스 응답 content는 비어 있지 않은 문자열이어야 합니다.");
   });
+
+  it("실제 HTTP 경로로 AI service 계약을 호출한다", async () => {
+    const aiService = await startAiServiceStub();
+    const generator = new AiServiceChatAnswerGenerator({
+      baseUrl: aiService.baseUrl,
+      timeoutMs: 5000
+    });
+
+    try {
+      const answer = await generator.generate({
+        projectId: "project-1",
+        ownerId: "owner-1",
+        question: "견적서 리스크를 알려줘",
+        contexts: [{ documentId: "document-1", title: "견적서.txt", content: "총액 1,000만원" }],
+        history: [{ role: ChatRole.USER, content: "이전 질문" }]
+      });
+
+      expect(aiService.requests).toEqual([
+        {
+          method: "POST",
+          path: "/chat/answers",
+          contentType: "application/json",
+          body: {
+            projectId: "project-1",
+            ownerId: "owner-1",
+            question: "견적서 리스크를 알려줘",
+            contexts: [{ documentId: "document-1", title: "견적서.txt", content: "총액 1,000만원" }],
+            history: [{ role: ChatRole.USER, content: "이전 질문" }]
+          }
+        }
+      ]);
+      expect(answer).toEqual({
+        content: "HTTP smoke answer [1]",
+        sources: [
+          {
+            documentId: "document-1",
+            title: "견적서.txt",
+            quote: "총액 1,000만원",
+            relevance: 0.91
+          }
+        ]
+      });
+    } finally {
+      await aiService.close();
+    }
+  });
 });
 
 type RecordingFetchResponse = {
@@ -143,4 +191,100 @@ class JsonHttpResponse implements ChatAnswerHttpResponse {
   async text(): Promise<string> {
     return JSON.stringify(this.response.body);
   }
+}
+
+type AiServiceStubRequest = {
+  method: string | undefined;
+  path: string | undefined;
+  contentType: string | undefined;
+  body: unknown;
+};
+
+type AiServiceStub = {
+  baseUrl: string;
+  requests: AiServiceStubRequest[];
+  close(): Promise<void>;
+};
+
+async function startAiServiceStub(): Promise<AiServiceStub> {
+  const requests: AiServiceStubRequest[] = [];
+  const server = createServer(async (request, response) => {
+    await handleAiServiceRequest(request, response, requests);
+  });
+
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  const address = server.address();
+
+  if (!isAddressInfo(address)) {
+    throw new Error("테스트 HTTP 서버 주소를 확인할 수 없습니다.");
+  }
+
+  return {
+    baseUrl: `http://127.0.0.1:${address.port}`,
+    requests,
+    close: () => closeServer(server)
+  };
+}
+
+async function handleAiServiceRequest(
+  request: IncomingMessage,
+  response: ServerResponse,
+  requests: AiServiceStubRequest[]
+): Promise<void> {
+  const body = await readRequestBody(request);
+  requests.push({
+    method: request.method,
+    path: request.url,
+    contentType: request.headers["content-type"],
+    body: JSON.parse(body) as unknown
+  });
+
+  response.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+  response.end(
+    JSON.stringify({
+      content: "HTTP smoke answer [1]",
+      sources: [
+        {
+          documentId: "document-1",
+          title: "견적서.txt",
+          quote: "총액 1,000만원",
+          relevance: 0.91
+        }
+      ]
+    })
+  );
+}
+
+async function readRequestBody(request: IncomingMessage): Promise<string> {
+  const chunks: Buffer[] = [];
+
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+
+  return Buffer.concat(chunks).toString("utf-8");
+}
+
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close((error) => {
+      if (error !== undefined) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+function isAddressInfo(address: string | AddressInfo | null): address is AddressInfo {
+  return typeof address === "object" && address !== null;
 }
