@@ -13,6 +13,9 @@ DOCUMIND_DEMO_OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
 DOCUMENT_STORAGE_PROVIDER="local"
 DOCUMENT_STORAGE_BASE_PATH="./.storage/documents"
 DOCUMENT_MAX_FILE_BYTES="52428800"
+CHAT_ANSWER_GENERATOR_PROVIDER="mock"
+AI_SERVICE_BASE_URL="http://localhost:8001"
+AI_SERVICE_TIMEOUT_MS="30000"
 NODE_ENV="development"
 PORT="3000"
 RUN_DB_INTEGRATION="false"
@@ -44,9 +47,112 @@ AWS S3를 직접 사용할 때는 `DOCUMENT_STORAGE_S3_ENDPOINT`를 빈 값으�
 
 S3 credential은 AWS SDK 기본 credential provider chain을 사용한다. 로컬 개발에서는 `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN` 또는 AWS profile을 사용할 수 있지만, 실제 access key와 secret key는 `.env`나 저장소 문서에 남기지 않는다.
 
-1차 MVP의 업로드 파일 보안 검사는 `DocumentSecurityScanner` port를 통해 실행된다. 로컬 기본 adapter는 `NoopDocumentSecurityScanner`이며 파일 내용을 저장하거나 외부 백신 엔진에 전달하지 않고 항상 clean 결과를 반환한다. 감염 의심 파일을 `FAILED` Document로 기록하고 원본 파일을 저장하지 않는 흐름은 테스트 fake scanner로 검증한다.
+현재 범위의 업로드 파일 보안 검사는 `DocumentSecurityScanner` port를 통해 실행된다. 로컬 기본 adapter는 `NoopDocumentSecurityScanner`이며 파일 내용을 저장하거나 외부 백신 엔진에 전달하지 않고 항상 clean 결과를 반환한다. 감염 의심 파일을 `FAILED` Document로 기록하고 원본 파일을 저장하지 않는 흐름은 테스트 fake scanner로 검증한다.
 
 실제 ClamAV 또는 clamd adapter 연동은 후속 범위다. 운영 adapter를 붙일 때도 scanner가 unavailable이면 Document와 원본 파일을 만들지 않고 `DOCUMENT_SECURITY_SCAN_UNAVAILABLE` 503 오류를 반환하는 계약은 유지한다.
+
+## AI 답변 생성 모드
+
+백엔드 Chat API는 `CHAT_ANSWER_GENERATOR_PROVIDER` 값으로 답변 생성 방식을 선택한다.
+
+기본값은 `mock`이다. 이 모드는 `documind-ai`나 Ollama를 실행하지 않아도 백엔드 채팅 API를 테스트할 수 있다.
+
+```env
+CHAT_ANSWER_GENERATOR_PROVIDER="mock"
+```
+
+`documind-ai`를 실제로 호출하려면 백엔드 `.env`를 다음처럼 설정한다.
+
+```env
+CHAT_ANSWER_GENERATOR_PROVIDER="ai-service"
+AI_SERVICE_BASE_URL="http://localhost:8001"
+AI_SERVICE_TIMEOUT_MS="30000"
+```
+
+이때 백엔드 실행 전에 `documind-ai` 서버가 `http://localhost:8001`에서 실행 중이어야 한다.
+
+## Ollama 기반 로컬 AI 실행
+
+Ollama 기반으로 실제 로컬 LLM 응답을 확인할 때는 프로세스를 다음 순서로 실행한다.
+
+1. Ollama 서버 실행
+
+```bash
+ollama serve
+```
+
+이미 Ollama 앱이나 백그라운드 서비스가 실행 중이면 이 단계는 생략할 수 있다.
+
+2. 사용할 모델 준비
+
+```bash
+ollama pull llama3.2
+```
+
+다른 모델을 사용할 때는 `documind-ai`의 `DOCUMIND_AI_OLLAMA_MODEL` 값도 같은 모델명으로 맞춘다.
+
+3. `documind-ai` 실행
+
+```bash
+cd /Users/rowing/Develop/organization/documind-ai-lab/documind-ai
+
+export DOCUMIND_AI_CHAT_PROVIDER="ollama"
+export DOCUMIND_AI_OLLAMA_BASE_URL="http://localhost:11434"
+export DOCUMIND_AI_OLLAMA_MODEL="llama3.2"
+export DOCUMIND_AI_OLLAMA_TIMEOUT_SECONDS="60"
+
+PYTHONPATH=src python3 -m documind_ai.main
+```
+
+4. `documind-backend` 실행
+
+```bash
+cd /Users/rowing/Develop/organization/documind-ai-lab/documind-backend
+
+export CHAT_ANSWER_GENERATOR_PROVIDER="ai-service"
+export AI_SERVICE_BASE_URL="http://localhost:8001"
+export AI_SERVICE_TIMEOUT_MS="30000"
+
+npm run start:dev
+```
+
+5. `documind-ai` 직접 smoke
+
+```bash
+curl -s -X POST http://localhost:8001/chat/answers \
+  -H "Content-Type: application/json" \
+  -d '{
+    "projectId": "project-1",
+    "ownerId": "owner-1",
+    "question": "견적서의 주요 리스크를 알려줘",
+    "contexts": [
+      {
+        "documentId": "document-1",
+        "title": "견적서.txt",
+        "content": "총액은 1000만원이며 납기는 별도 협의입니다."
+      }
+    ],
+    "history": []
+  }'
+```
+
+6. 백엔드 Chat API smoke
+
+```bash
+OWNER_ID="7f0d8c54-7e3a-4a7f-b4b2-2c8f8c5a1d6e"
+PROJECT_ID="<projectId>"
+
+curl -s -X POST "http://localhost:3000/projects/$PROJECT_ID/chat/messages" \
+  -H "Content-Type: application/json" \
+  -H "X-Owner-Id: $OWNER_ID" \
+  -d '{"content":"업로드된 문서 기준으로 주요 리스크를 알려줘"}'
+```
+
+기대 결과는 다음과 같다.
+
+- `documind-ai` 직접 smoke 응답에는 `content`와 `sources`가 있다.
+- 백엔드 Chat API 응답에는 `userMessage`와 `assistantMessage`가 있다.
+- Ollama 연결 실패, timeout, 잘못된 응답은 백엔드에서 `CHAT_ANSWER_GENERATION_FAILED` 흐름으로 처리된다.
 
 계정 권한 기준은 다음과 같다.
 
